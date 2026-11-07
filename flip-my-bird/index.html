@@ -121,6 +121,17 @@ textarea { min-height: 64px; resize: vertical; }
 a { color: var(--accent); }
 .links a { font-weight: 600; text-decoration: none; }
 .links a:hover { text-decoration: underline; }
+.cost { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.cost .line { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+.cost .line span:last-child { font: 500 14px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cost .line.total { font-weight: 700; font-size: 15px; }
+.cost .line.total span:last-child { font-weight: 700; color: var(--accent); }
+.cost .sub { font-size: 12px; color: var(--muted); }
+.usage { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 12px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.estimate { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.estimate strong { font-family: var(--mono); }
 .reqs { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
 .req { display: flex; gap: 10px; align-items: baseline; font-size: 14px; flex-wrap: wrap; }
 .req .what { flex: 1; min-width: 0; }
@@ -137,6 +148,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
 
 @media (max-width: 460px) {
   .grid2 { grid-template-columns: 1fr; }
+  .grid4 { grid-template-columns: 1fr 1fr; }
   .bonus-row { grid-template-columns: 1fr 1fr auto; }
   .bonus-row .src { grid-column: 1 / -1; }
   .bonus-row .amt-in { grid-column: 1; } .bonus-row .st { grid-column: 2 / -1; }
@@ -170,6 +182,18 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
   <section class="sec" id="now-sec">
     <h2>Right now</h2>
     <div id="now"></div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-head"><h2>Your usage</h2><span class="sync" id="usage-saved"></span></div>
+    <div class="usage">
+      <p class="note" style="margin:0">Average per day, from the grid. Your bill or battery app shows this. With solar and a battery these are usually small numbers. Used to estimate every deal's cost.</p>
+      <div class="grid3">
+        <div class="field"><label for="u-peak">Peak bought (kWh)</label><input id="u-peak" type="number" min="0" step="0.1" inputmode="decimal" placeholder="e.g. 1"></div>
+        <div class="field"><label for="u-off">Off-peak bought (kWh)</label><input id="u-off" type="number" min="0" step="0.1" inputmode="decimal" placeholder="e.g. 3"></div>
+        <div class="field"><label for="u-exp">Solar sent out (kWh)</label><input id="u-exp" type="number" min="0" step="0.1" inputmode="decimal" placeholder="e.g. 10"></div>
+      </div>
+    </div>
   </section>
 
   <section class="sec">
@@ -238,6 +262,17 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
         <input id="f-noreturn" type="number" min="0" max="60" step="1" value="12" inputmode="numeric">
         <span class="hint">After you leave. Often 12.</span>
       </div>
+    </div>
+    <div class="field">
+      <label>Rates</label>
+      <span class="hint">From the plan's fact sheet. Leave blank if you don't know yet.</span>
+      <div class="grid4">
+        <div class="field"><label for="r-supply">Supply ($/day)</label><input id="r-supply" type="number" min="0" step="0.01" inputmode="decimal" placeholder="2.53"></div>
+        <div class="field"><label for="r-peak">Peak (c/kWh)</label><input id="r-peak" type="number" min="0" step="0.01" inputmode="decimal" placeholder="35"></div>
+        <div class="field"><label for="r-off">Off-peak (c/kWh)</label><input id="r-off" type="number" min="0" step="0.01" inputmode="decimal" placeholder="24"></div>
+        <div class="field"><label for="r-fit">Feed-in (c/kWh)</label><input id="r-fit" type="number" min="0" step="0.01" inputmode="decimal" placeholder="3"></div>
+      </div>
+      <div id="estimate"></div>
     </div>
     <div class="field">
       <label>Bonuses for this deal</label>
@@ -339,11 +374,37 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     out.push(`<a href="https://www.google.com/search?q=${q("cashback terms conditions stay days")}" target="_blank" rel="noopener">Search the terms</a>`);
     return out.join("");
   }
+  // Cost model: supply ($/day) + peak and off-peak bought (c/kWh) - solar credit (c/kWh).
+  const hasRates = (r) => r && [r.supply, r.peak, r.off, r.fit].some(v => v !== null && v !== undefined && v !== "");
+  function dailyCost(r, u) {
+    const n = (v) => Number(v) || 0;
+    const supply = n(r.supply), buy = (n(r.peak) * n(u.peak) + n(r.off) * n(u.off)) / 100, credit = n(r.fit) * n(u.exp) / 100;
+    return { supply, buy, credit, total: supply + buy - credit };
+  }
+  const hasUsage = (u) => u && [u.peak, u.off, u.exp].some(v => Number(v) > 0);
+  const m2 = (n) => (n < 0 ? "−$" : "$") + Math.abs(n).toFixed(2);
+  function costBlock(f) {
+    if (!hasRates(f.rates)) return "";
+    const u = use(), d = dailyCost(f.rates, u);
+    const start = parse(f.start), days = Math.max(1, daysBetween(start, freeDate(f)));
+    const bonus = (f.bonuses || []).reduce((s, b) => s + Number(b.amount || 0), 0);
+    const stay = d.total * days;
+    return `<div class="cost">
+      <div class="line"><span>Expected cost a day</span><span>${m2(d.total)}</span></div>
+      <div class="sub">Supply ${m2(d.supply)} · power bought ${m2(d.buy)} · solar credit ${m2(-d.credit)}${hasUsage(u) ? "" : " · add your usage below for a real estimate"}</div>
+      <div class="line"><span>Over the stay (${days} days)</span><span>${money(stay)}</span></div>
+      ${bonus ? `<div class="line"><span>Less bonuses</span><span>−${money(bonus)}</span></div>
+      <div class="line total"><span>What this deal really costs you</span><span>${stay - bonus < 0 ? "−" : ""}${money(Math.abs(stay - bonus))}</span></div>` : ""}
+    </div>`;
+  }
   const returnDate = (f) => f.end ? addMonths(parse(f.end), f.noReturnMonths) : null;
   const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+(energy|electric|power)$/, "");
 
   // ---------- state & storage ----------
   let flips = [];
+  let usage = {};              // { peak, off, exp } kWh/day
+  const EX_USAGE = { peak: 1, off: 3, exp: 10 };
+  const use = () => example ? EX_USAGE : usage;
   let example = null;          // when showing example data
   let store = null;            // { mode, save, remove }
   let dl = null;               // downloads namespace
@@ -353,11 +414,13 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
 
   function localStore() {
     try { flips = JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { flips = []; }
+    try { usage = JSON.parse(localStorage.getItem(LS_KEY + ".usage") || "{}"); } catch { usage = {}; }
     const persist = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(flips)); } catch {} };
     return {
       mode: "local",
       async save(f) { flips = flips.filter(x => x.id !== f.id).concat(f); persist(); render(); },
       async remove(id) { flips = flips.filter(x => x.id !== id); persist(); render(); },
+      async saveUsage(u) { usage = u; try { localStorage.setItem(LS_KEY + ".usage", JSON.stringify(u)); } catch {} render(); },
     };
   }
 
@@ -370,10 +433,13 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       store = localStore();
       setSync("Saved on this device only");
       $("#backup-note").textContent = "Your deals are saved in this browser only. Download a backup now and then so you don't lose them.";
+      fillUsage();
       render();
       return;
     }
     const col = db.collection("flips");
+    const usageDoc = db.doc("profile/usage");
+    usageDoc.onSnapshot((snap) => { usage = snap.exists ? { ...snap.data() } : {}; fillUsage(); render(); }, () => {});
     let timer = setTimeout(() => setSync("Can't reach your saved deals yet…"), 10000);
     col.onSnapshot((snap) => {
       flips = snap.docs.map(d => ({ ...d.data(), id: d.id }));
@@ -384,6 +450,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       mode: "db",
       async save(f) { await col.doc(f.id).set(f); },
       async remove(id) { await col.doc(id).delete(); },
+      async saveUsage(u) { usage = u; render(); await usageDoc.set(u); },
     };
   }
   function setSync(t) { $("#sync").textContent = t; }
@@ -392,6 +459,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
   function render() {
     const all = sortFlips(data());
     $("#example-banner").hidden = !example;
+    fillUsage();
     renderNow(all);
     renderMoney(all);
     renderCooldowns(all);
@@ -442,6 +510,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
         ${count}
         <div><div class="track ${done ? "done" : ""}"><i style="width:${pct}%"></i></div>
           <div class="ends"><span>${esc(fmt(start))}</span><span>${esc(fmt(free))}</span></div></div>
+        ${costBlock(f)}
         <div class="reqs">${stayRules(f).map((r, i, a) => `<div class="req ${i === a.length - 1 && !done ? "last" : ""}">
             <span class="what">${r.date <= t ? '<span class="tick">✓</span> ' : ""}<strong>${esc(r.label)}</strong> · stay ${esc(r.detail)}</span>
             <span class="when">${esc(fmt(r.date))}</span>
@@ -551,11 +620,14 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     $("#f-stay").value = d.stayMonths ?? 3;
     $("#f-noreturn").value = d.noReturnMonths ?? 12;
     $("#f-notes").value = d.notes || "";
+    const r = d.rates || {};
+    $("#r-supply").value = r.supply ?? ""; $("#r-peak").value = r.peak ?? ""; $("#r-off").value = r.off ?? ""; $("#r-fit").value = r.fit ?? "";
     $("#bonus-rows").innerHTML = "";
     (d.bonuses && d.bonuses.length ? d.bonuses : [{}]).forEach(bonusRow);
     const del = $("#del-btn"); del.hidden = !deal; del.textContent = "Delete"; del.classList.remove("confirm-del");
     $("#save-btn").textContent = from ? "Save new deal" : "Save";
     updateWarn();
+    updateEstimate();
     dlg.showModal();
     if (!deal) $("#f-retailer").focus();
   }
@@ -581,6 +653,19 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
   ["#f-retailer", "#f-start"].forEach(s => $(s).addEventListener("input", updateWarn));
   $("#f-retailer").addEventListener("input", () => document.querySelectorAll("#bonus-rows .bonus-row").forEach(r => r._links && r._links()));
 
+  const numOrNull = (id) => { const v = $(id).value; return v === "" ? null : Math.max(0, Number(v)); };
+  const formRates = () => ({ supply: numOrNull("#r-supply"), peak: numOrNull("#r-peak"), off: numOrNull("#r-off"), fit: numOrNull("#r-fit") });
+  function updateEstimate() {
+    const r = formRates(), el = $("#estimate");
+    if (!hasRates(r) || !$("#f-start").value) { el.innerHTML = ""; return; }
+    const draft = { start: $("#f-start").value, retailer: $("#f-retailer").value, stayMonths: Number($("#f-stay").value || 0),
+      bonuses: [...document.querySelectorAll("#bonus-rows .bonus-row")].map(row => ({ amount: Number(row.querySelector(".amt-in").value || 0), stayDays: Number(row.querySelector(".days-in input").value || 0) })) };
+    const d = dailyCost(r, use()), days = Math.max(1, daysBetween(parse(draft.start), freeDate(draft)));
+    const bonus = draft.bonuses.reduce((s, b) => s + b.amount, 0), stay = d.total * days;
+    el.innerHTML = `<div class="estimate">${hasUsage(use()) ? "With your usage" : "Supply only (add your usage on the main page)"}: <strong>${m2(d.total)}</strong>/day, <strong>${money(stay)}</strong> over the ${days}-day stay${bonus ? `, <strong>${money(stay - bonus)}</strong> after ${money(bonus)} in bonuses` : ""}.</div>`;
+  }
+  form.addEventListener("input", updateEstimate);
+
   function readForm() {
     const retailer = $("#f-retailer").value.trim();
     const start = $("#f-start").value;
@@ -603,6 +688,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       noReturnMonths: Math.max(0, Number($("#f-noreturn").value || 0)),
       bonuses,
       notes: $("#f-notes").value.trim(),
+      rates: formRates(),
       createdAt: old.createdAt || new Date().toISOString(),
     };
   }
@@ -655,8 +741,21 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
   $("#add-past").onclick = () => openForm({ past: true });
   $("#exit-example").onclick = () => { example = null; render(); };
 
+  // ---------- usage ----------
+  function fillUsage() {
+    for (const [k, id] of [["peak", "#u-peak"], ["off", "#u-off"], ["exp", "#u-exp"]])
+      if (document.activeElement !== $(id)) $(id).value = use()[k] ?? "";
+  }
+  ["#u-peak", "#u-off", "#u-exp"].forEach(id => $(id).addEventListener("change", async () => {
+    const u = { peak: numOrNull("#u-peak"), off: numOrNull("#u-off"), exp: numOrNull("#u-exp") };
+    if (example) { example = null; }
+    if (!store) return;
+    try { await store.saveUsage(u); $("#usage-saved").textContent = "Saved"; setTimeout(() => $("#usage-saved").textContent = "", 1500); }
+    catch { $("#usage-saved").textContent = "Couldn't save"; }
+  }));
+
   // ---------- backup ----------
-  const backupJSON = () => JSON.stringify({ app: "flip-my-bird", version: 1, exportedAt: new Date().toISOString(), flips: data() }, null, 2);
+  const backupJSON = () => JSON.stringify({ app: "flip-my-bird", version: 1, exportedAt: new Date().toISOString(), flips: data(), usage: use() }, null, 2);
   $("#dl-backup").onclick = async () => {
     if (!dl) { setSync("Download isn't available here. Use Copy backup."); return; }
     try { await dl.save({ filename: `flip-my-bird-${toISO(today())}.json`, data: new Blob([backupJSON()], { type: "application/json" }) }); }
@@ -687,9 +786,12 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       retailer: String(f.retailer), start: String(f.start), end: f.end ? String(f.end) : null,
       fuel: String(f.fuel || "Electricity"), stayMonths: Number(f.stayMonths ?? 3), noReturnMonths: Number(f.noReturnMonths ?? 12),
       bonuses: Array.isArray(f.bonuses) ? f.bonuses.map(b => ({ id: String(b.id || uid()), source: String(b.source || ""), amount: Number(b.amount || 0), stayDays: Number(b.stayDays || 0), status: ["pending","tracked","paid"].includes(b.status) ? b.status : "pending" })) : [],
-      notes: String(f.notes || ""), createdAt: f.createdAt || new Date().toISOString(),
+      notes: String(f.notes || ""),
+      rates: f.rates && typeof f.rates === "object" ? { supply: f.rates.supply ?? null, peak: f.rates.peak ?? null, off: f.rates.off ?? null, fit: f.rates.fit ?? null } : null,
+      createdAt: f.createdAt || new Date().toISOString(),
     }));
     example = null;
+    try { const j = JSON.parse($("#restore-text").value); if (j && j.usage && store) await store.saveUsage({ peak: j.usage.peak ?? null, off: j.usage.off ?? null, exp: j.usage.exp ?? null }); } catch {}
     try { for (const f of clean) await persist(f); $("#restore-dlg").close(); }
     catch { $("#restore-msg").textContent = "Some deals couldn't be saved. Try again."; }
   });
@@ -706,7 +808,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       { id: "ex3", retailer: "EnergyAustralia", fuel: "Electricity", start: iso(s3), end: iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 80)), stayMonths: 2, noReturnMonths: 12,
         bonuses: [{ id: "b4", source: "Econnex", amount: 100, status: "tracked", stayDays: 45 }], notes: "Example", createdAt: "" },
       { id: "ex4", retailer: "Red Energy", fuel: "Electricity", start: iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 80)), end: null, stayMonths: 3, noReturnMonths: 12,
-        bonuses: [{ id: "b5", source: "Econnex via ShopBack", amount: 140, status: "tracked", stayDays: 90 }], notes: "Example", createdAt: "" },
+        bonuses: [{ id: "b5", source: "Econnex via ShopBack", amount: 140, status: "tracked", stayDays: 90 }], notes: "Example", rates: { supply: 1.35, peak: 38, off: 26, fit: 4 }, createdAt: "" },
     ];
   }
 

@@ -16,6 +16,9 @@ When you tap **I've flipped**, the old deal gets an end date and you add the new
 warns you if you're leaving before the minimum stay or signing back up with a retailer that's
 still in its no-return window.
 
+4. **What will this deal really cost?** Put in a deal's rates (supply, peak, off-peak, feed-in) and
+   your average daily grid use. Each deal shows its cost per day, over the stay, and after bonuses.
+
 ## Running it
 
 It's one file with no build step. Open `index.html` in a browser.
