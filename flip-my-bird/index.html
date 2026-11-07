@@ -6,6 +6,7 @@
 <style>
 /* Layout: one narrow column, phone-first. The current deal leads, then money owed, then who you can go back to, then history. */
 :root {
+  --s-recv: #c23a5f; --s-owed: #e88aa3; --s-plan: #f6cfda;
   --bg: #eef0f1;          /* galah grey, cool */
   --surface: #ffffff;
   --ink: #1f2428;
@@ -23,12 +24,12 @@
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #15191c; --surface: #1e2428; --ink: #e9ecee; --muted: #9aa4ab; --line: #333b41;
-  --accent: #f07393; --accent-ink: #1b0d12; --accent-soft: #3c2129;
+  --accent: #f07393; --accent-ink: #1b0d12; --accent-soft: #3c2129; --s-recv: #f07393; --s-owed: #a85068; --s-plan: #5a2f3b;
   --ok: #6fd19c; --ok-soft: #173326; --wait: #f2b95e; --wait-soft: #3a2c14; --stop: #f28b82; --stop-soft: #3d1f1d;
   color-scheme: dark; } }
 :root[data-theme="dark"] {
   --bg: #15191c; --surface: #1e2428; --ink: #e9ecee; --muted: #9aa4ab; --line: #333b41;
-  --accent: #f07393; --accent-ink: #1b0d12; --accent-soft: #3c2129;
+  --accent: #f07393; --accent-ink: #1b0d12; --accent-soft: #3c2129; --s-recv: #f07393; --s-owed: #a85068; --s-plan: #5a2f3b;
   --ok: #6fd19c; --ok-soft: #173326; --wait: #f2b95e; --wait-soft: #3a2c14; --stop: #f28b82; --stop-soft: #3d1f1d;
   color-scheme: dark; }
 
@@ -141,6 +142,44 @@ a { color: var(--accent); }
 .conflict { background: var(--stop-soft); color: var(--stop); border-radius: 14px; padding: 14px 16px; display: grid; gap: 10px; font-size: 14px; }
 .conflict .actions button { border-color: var(--stop); color: var(--stop); background: transparent; }
 .ideas { display: grid; gap: 10px; }
+/* Tabs */
+.tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px; justify-self: start; }
+.tabs a { font: 600 14px/1 var(--body); padding: 9px 16px; border-radius: 999px; color: var(--muted); text-decoration: none; }
+.tabs a[aria-current="page"] { background: var(--ink); color: var(--bg); }
+.view { display: grid; gap: 28px; }
+
+/* Savings */
+.saver { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 20px; display: grid; gap: 16px; }
+.saver .hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; }
+.saver .hero .k { font-size: 13px; color: var(--muted); }
+.saver .hero .v { font: 800 52px/0.95 var(--display); letter-spacing: -0.03em; }
+.saver .stats { display: flex; gap: 18px; flex-wrap: wrap; }
+.saver .stat { display: grid; gap: 2px; }
+.saver .stat .v2 { font: 700 18px/1.1 var(--body); }
+.key { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.key i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+.key i.line { height: 2px; border-radius: 1px; width: 14px; background: var(--ink); }
+.legend { display: flex; gap: 6px 14px; flex-wrap: wrap; }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font: 11px var(--body); fill: var(--muted); }
+.chart text.end { font: 700 12px var(--body); fill: var(--ink); }
+.chart text.now { fill: var(--ink); font-weight: 700; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); border-radius: 10px; padding: 8px 10px; font-size: 12px; line-height: 1.45; min-width: 150px; z-index: 2; }
+.tip .r { display: flex; justify-content: space-between; gap: 12px; }
+.tip .r span:last-child { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.tip .h { font-weight: 700; margin-bottom: 2px; }
+details.more > summary { cursor: pointer; font-size: 13px; color: var(--accent); font-weight: 600; list-style: none; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::before { content: "▸ "; }
+details.more[open] > summary::before { content: "▾ "; }
+details.more[open] > summary { margin-bottom: 10px; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th, .tbl td { text-align: right; padding: 6px 4px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.tbl th:first-child, .tbl td:first-child { text-align: left; }
+.tbl th { color: var(--muted); font-weight: 600; }
+.deal .summary { font-size: 14px; color: var(--muted); }
+.deal .summary strong { color: var(--ink); font-family: var(--mono); font-weight: 500; }
 .reqs { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
 .req { display: flex; gap: 10px; align-items: baseline; font-size: 14px; flex-wrap: wrap; }
 .req .what { flex: 1; min-width: 0; }
@@ -188,6 +227,31 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     <button class="small" id="exit-example">Back to my deals</button>
   </div>
 
+  <nav class="tabs" aria-label="Views"><a href="#overview" id="tab-overview">Overview</a><a href="#details" id="tab-details">Details</a></nav>
+
+  <div class="view" id="view-overview">
+  <section class="sec" aria-labelledby="sav-h">
+    <h2 id="sav-h">Flip savings</h2>
+    <div class="saver">
+      <div class="hero">
+        <div><div class="k">Received so far</div><div class="v" id="sv-recv">$0</div></div>
+        <div class="stats">
+          <div class="stat"><span class="k note">On the way</span><span class="v2" id="sv-owed">$0</span></div>
+          <div class="stat"><span class="k note">Planned</span><span class="v2" id="sv-plan">$0</span></div>
+          <div class="stat"><span class="k note">All up</span><span class="v2" id="sv-total">$0</span></div>
+        </div>
+      </div>
+      <div class="legend" aria-hidden="true">
+        <span class="key"><i style="background:var(--s-recv)"></i>Received</span>
+        <span class="key"><i style="background:var(--s-owed)"></i>On the way (deals you're on)</span>
+        <span class="key"><i style="background:var(--s-plan)"></i>Planned (deals you're considering)</span>
+        <span class="key"><i class="line"></i>Running total</span>
+      </div>
+      <div class="chart" id="chart"></div>
+      <details class="more"><summary>Show as a table</summary><div style="overflow-x:auto" id="chart-table"></div></details>
+    </div>
+  </section>
+
   <section class="sec" id="now-sec">
     <h2>Right now</h2>
     <div id="now"></div>
@@ -197,6 +261,9 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     <div class="sec-head"><h2>Deals I'm considering</h2><button class="ghost small" data-act="consider">+ Add a deal to compare</button></div>
     <div class="ideas" id="ideas"></div>
   </section>
+  </div>
+
+  <div class="view" id="view-details" hidden>
 
   <section class="sec">
     <div class="sec-head"><h2>Your usage</h2><span class="sync" id="usage-saved"></span></div>
@@ -211,8 +278,8 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
   </section>
 
   <section class="sec">
-    <div class="sec-head"><h2>Bonuses</h2></div>
-    <div class="money">
+    <div class="sec-head"><h2>Bonuses still to come</h2></div>
+    <div class="money" hidden>
       <div class="tile"><span class="k">Collected so far</span><span class="v" id="paid">$0</span></div>
       <div class="tile"><span class="k">Still waiting on</span><span class="v" id="pending">$0</span></div>
     </div>
@@ -238,6 +305,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       <button class="small" id="restore-open">Restore</button>
     </div>
   </section>
+  </div>
 </div>
 
 <dialog id="dlg">
@@ -454,6 +522,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
   }
 
   async function boot() {
+    route();
     render();
     const c = window.claude;
     const db = c && c.use ? await c.use("db").catch(() => null) : null;
@@ -490,6 +559,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     $("#example-banner").hidden = !example;
     fillUsage();
     const live = all.filter(isLive), ideas = all.filter(f => f.considering);
+    renderSavings(all);
     renderNow(live);
     renderIdeas(ideas, live);
     renderMoney(live);
@@ -550,12 +620,15 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
         ${count}
         <div><div class="track ${done ? "done" : ""}"><i style="width:${pct}%"></i></div>
           <div class="ends"><span>${esc(fmt(start))}</span><span>${esc(fmt(free))}</span></div></div>
+        <div class="summary">${hasRates(f.rates) ? `About <strong>${m2(dailyCost(f.rates, use()).total)}</strong> a day · ` : ""}${stayRules(f).length} stay rule${stayRules(f).length > 1 ? "s" : ""}, ${stayRules(f).filter(r => r.date <= t).length} done</div>
+        <details class="more"><summary>Stay rules and costs</summary>
         ${costBlock(f) || `<div class="cost"><div class="sub">Add ${esc(f.retailer)}'s rates (Edit deal) to compare it with the deals you're considering.</div></div>`}
         <div class="reqs">${stayRules(f).map((r, i, a) => `<div class="req ${i === a.length - 1 && !done ? "last" : ""}">
             <span class="what">${r.date <= t ? '<span class="tick">✓</span> ' : ""}<strong>${esc(r.label)}</strong> · stay ${esc(r.detail)}</span>
             <span class="when">${esc(fmt(r.date))}</span>
             ${r.source !== null ? `<span class="links">${termsLinks(r.source, f.retailer)}</span>` : ""}
           </div>`).join("")}</div>
+        </details>
         <div class="actions">
           <button class="primary" data-act="flip" data-id="${esc(f.id)}">I've flipped</button>
           <button data-act="edit" data-id="${esc(f.id)}">Edit deal</button>
@@ -607,6 +680,140 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       </div>`;
     }).join("");
   }
+
+  // When each bonus lands: paid ones on the day they were paid (or the deal's start),
+  // the rest once their stay rule is met (or today, if that date has passed).
+  function bonusEvents(all) {
+    const t = today(), out = [];
+    for (const f of all) {
+      const start = parse(f.start); if (!start) continue;
+      for (const b of (f.bonuses || [])) {
+        const amount = Number(b.amount || 0); if (!amount) continue;
+        let kind, date;
+        if (f.considering) { kind = "plan"; }
+        else if (b.status === "paid") { kind = "recv"; date = parse(b.paidOn) || start; }
+        else { kind = "owed"; }
+        if (!date) {
+          date = Number(b.stayDays) > 0 ? addDays(start, b.stayDays) : addMonths(start, f.stayMonths || 0);
+          if (date < t) date = t;
+        }
+        out.push({ kind, date, amount, source: b.source || "Bonus", retailer: f.retailer });
+      }
+    }
+    return out.sort((a, b) => a.date - b.date);
+  }
+
+  const monthKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+  function monthsOf(events) {
+    if (!events.length) return [];
+    const first = events[0].date, last = events[events.length - 1].date, t = today();
+    const end = last > t ? last : t;
+    const months = [];
+    for (let d = new Date(first.getFullYear(), first.getMonth(), 1); d <= end; d = new Date(d.getFullYear(), d.getMonth() + 1, 1))
+      months.push({ d, key: monthKey(d), recv: 0, owed: 0, plan: 0, items: [] });
+    for (const e of events) { const m = months.find(x => x.key === monthKey(e.date)); if (m) { m[e.kind] += e.amount; m.items.push(e); } }
+    let run = 0; for (const m of months) { run += m.recv + m.owed + m.plan; m.cum = run; }
+    return months.slice(-24);
+  }
+
+  function niceMax(v) { if (v <= 0) return 100; const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p; return 10 * p; }
+
+  let lastMonths = [];
+  function renderSavings(all) {
+    const ev = bonusEvents(all);
+    const sum = (k) => ev.filter(e => e.kind === k).reduce((s, e) => s + e.amount, 0);
+    $("#sv-recv").textContent = money(sum("recv"));
+    $("#sv-owed").textContent = money(sum("owed"));
+    $("#sv-plan").textContent = money(sum("plan"));
+    $("#sv-total").textContent = money(sum("recv") + sum("owed") + sum("plan"));
+    lastMonths = monthsOf(ev);
+    drawChart();
+    const ms = lastMonths;
+    $("#chart-table").innerHTML = ms.length ? `<table class="tbl"><thead><tr><th>Month</th><th>Received</th><th>On the way</th><th>Planned</th><th>Running total</th></tr></thead><tbody>${
+      ms.map(m => `<tr><td>${esc(m.d.toLocaleDateString("en-AU", { month: "short", year: "numeric" }))}</td><td>${m.recv ? money(m.recv) : "–"}</td><td>${m.owed ? money(m.owed) : "–"}</td><td>${m.plan ? money(m.plan) : "–"}</td><td>${money(m.cum)}</td></tr>`).join("")}</tbody></table>` : "";
+  }
+
+  function drawChart() {
+    const el = $("#chart"), ms = lastMonths;
+    if (!ms.length) { el.innerHTML = `<div class="note">Add a deal with a bonus and your savings build up here, month by month.</div>`; return; }
+    const W = Math.max(280, el.clientWidth || 600), H = 220, L = 44, Rp = 44, T = 16, B = 28;
+    const iw = W - L - Rp, ih = H - T - B;
+    const max = niceMax(Math.max(...ms.map(m => m.cum)));
+    const y = (v) => T + ih - (v / max) * ih;
+    const band = iw / ms.length, bw = Math.min(24, band * 0.62);
+    const cx = (i) => L + band * i + band / 2;
+    const nowKey = monthKey(today());
+    let g = "";
+    for (let i = 0; i <= 4; i++) {
+      const v = (max / 4) * i, yy = y(v);
+      g += `<line x1="${L}" x2="${W - Rp}" y1="${yy}" y2="${yy}" stroke="var(--line)" stroke-width="1"/>`;
+      g += `<text x="${L - 8}" y="${yy + 4}" text-anchor="end">${money(v)}</text>`;
+    }
+    const seg = (x, y0, y1, fill, top) => {
+      const h = y0 - y1; if (h <= 0) return "";
+      const r = top ? Math.min(4, h, bw / 2) : 0;
+      return `<path fill="${fill}" d="M${x},${y0} V${y1 + r} Q${x},${y1} ${x + r},${y1} H${x + bw - r} Q${x + bw},${y1} ${x + bw},${y1 + r} V${y0} Z"/>`;
+    };
+    let bars = "", labels = "";
+    ms.forEach((m, i) => {
+      const x = cx(i) - bw / 2;
+      const parts = [["recv", "var(--s-recv)"], ["owed", "var(--s-owed)"], ["plan", "var(--s-plan)"]].filter(([k]) => m[k] > 0);
+      let base = 0;
+      parts.forEach(([k, fill], j) => {
+        const y0 = y(base) - (j ? 2 : 0), y1 = y(base + m[k]);
+        bars += seg(x, y0, y1, fill, j === parts.length - 1);
+        base += m[k];
+      });
+      const showLabel = ms.length <= 8 || i % Math.ceil(ms.length / 8) === 0 || m.key === nowKey;
+      if (showLabel) {
+        const jan = m.d.getMonth() === 0 || i === 0;
+        labels += `<text x="${cx(i)}" y="${H - 8}" text-anchor="middle" class="${m.key === nowKey ? "now" : ""}">${esc(m.d.toLocaleDateString("en-AU", { month: "short" }))}${jan ? " " + String(m.d.getFullYear()).slice(2) : ""}</text>`;
+      }
+    });
+    // Step line: flat between months, rising where money lands.
+    const pts = ms.map((m, i) => `${i ? `${cx(i)},${y(ms[i - 1].cum)} ` : ""}${cx(i)},${y(m.cum)}`).join(" ");
+    const li = ms.length - 1, lx = cx(li), ly = y(ms[li].cum);
+    const svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Bonuses by month, stacked by received, on the way and planned, with a running total line reaching ${money(ms[li].cum)}">
+      ${g}${bars}
+      <polyline points="${pts}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="${lx}" cy="${ly}" r="4" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/>
+      <text class="end" x="${lx + 8}" y="${ly + 4}">${money(ms[li].cum)}</text>
+      ${labels}
+      <line id="hover-line" x1="0" x2="0" y1="${T}" y2="${T + ih}" stroke="var(--muted)" stroke-width="1" opacity="0"/>
+      ${ms.map((m, i) => `<rect data-i="${i}" x="${L + band * i}" y="${T}" width="${band}" height="${ih + B}" fill="transparent"/>`).join("")}
+    </svg><div class="tip" id="tip" hidden></div>`;
+    el.innerHTML = svg;
+    const tip = $("#tip"), hl = $("#hover-line");
+    const show = (i) => {
+      const m = ms[i]; if (!m) return;
+      const row = (k, v) => `<div class="r"><span>${k}</span><span>${money(v)}</span></div>`;
+      tip.innerHTML = `<div class="h">${esc(m.d.toLocaleDateString("en-AU", { month: "long", year: "numeric" }))}</div>${m.items.map(e => `<div class="r"><span>${esc(e.source)} · ${esc(e.retailer)}</span><span>${money(e.amount)}</span></div>`).join("") || '<div class="r"><span>No bonuses this month</span><span></span></div>'}${row("Running total", m.cum)}`;
+      tip.hidden = false;
+      const sx = el.clientWidth / W, px = cx(i) * sx;
+      const tw = tip.offsetWidth;
+      tip.style.left = Math.max(0, Math.min(el.clientWidth - tw, px - tw / 2)) + "px";
+      tip.style.top = Math.max(0, y(m.cum) * sx - tip.offsetHeight - 12) + "px";
+      hl.setAttribute("x1", cx(i)); hl.setAttribute("x2", cx(i)); hl.setAttribute("opacity", "0.5");
+    };
+    const hide = () => { tip.hidden = true; hl.setAttribute("opacity", "0"); };
+    el.querySelectorAll("rect[data-i]").forEach(r => {
+      r.addEventListener("pointerenter", () => show(+r.dataset.i));
+      r.addEventListener("pointerdown", () => show(+r.dataset.i));
+    });
+    el.querySelector("svg").addEventListener("pointerleave", hide);
+  }
+  let rsz; window.addEventListener("resize", () => { clearTimeout(rsz); rsz = setTimeout(drawChart, 150); });
+
+  // ---------- views ----------
+  function route() {
+    const v = location.hash === "#details" ? "details" : "overview";
+    $("#view-overview").hidden = v !== "overview";
+    $("#view-details").hidden = v !== "details";
+    $("#tab-overview").setAttribute("aria-current", v === "overview" ? "page" : "false");
+    $("#tab-details").setAttribute("aria-current", v === "details" ? "page" : "false");
+    if (v === "overview") drawChart();
+  }
+  window.addEventListener("hashchange", route);
 
   function renderMoney(all) {
     let paid = 0, pending = 0; const rows = [];
@@ -671,6 +878,8 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     const row = document.createElement("div");
     row.className = "bonus-row";
     row.dataset.id = b.id || uid();
+    if (b.paidOn) row.dataset.paidOn = b.paidOn;
+    if (b.status === "paid") row.dataset.wasPaid = "1";
     row.innerHTML = `
       <input class="src" list="sources" placeholder="Where from (ShopBack…)" aria-label="Bonus from" value="${esc(b.source || "")}">
       <input class="amt-in" type="number" min="0" step="1" inputmode="decimal" placeholder="$" aria-label="Amount in dollars" value="${esc(b.amount ?? "")}">
@@ -785,6 +994,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       amount: Number(r.querySelector(".amt-in").value || 0),
       stayDays: Math.max(0, Number(r.querySelector(".days-in input").value || 0)),
       status: r.querySelector(".st").value,
+      paidOn: r.querySelector(".st").value === "paid" ? (r.dataset.paidOn || (r.dataset.wasPaid ? null : toISO(today()))) : null,
     })).filter(b => b.source || b.amount);
     return {
       id: editing || uid(),
@@ -842,7 +1052,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     else if (act === "edit" && deal) openForm({ deal });
     else if (act === "flip" && deal) openForm({ from: deal });
     else if (act === "paid" && deal) {
-      const bonuses = deal.bonuses.map(b => b.id === t.dataset.b ? { ...b, status: "paid" } : b);
+      const bonuses = deal.bonuses.map(b => b.id === t.dataset.b ? { ...b, status: "paid", paidOn: toISO(today()) } : b);
       t.disabled = true;
       try { await persist({ ...deal, bonuses }); } catch { t.disabled = false; }
     }
@@ -895,7 +1105,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       id: String(f.id || uid()).replace(/[^A-Za-z0-9_\-.~:@+]/g, "").slice(0, 60) || uid(),
       retailer: String(f.retailer), start: String(f.start), end: f.end ? String(f.end) : null,
       fuel: String(f.fuel || "Electricity"), stayMonths: Number(f.stayMonths ?? 3), noReturnMonths: Number(f.noReturnMonths ?? 12),
-      bonuses: Array.isArray(f.bonuses) ? f.bonuses.map(b => ({ id: String(b.id || uid()), source: String(b.source || ""), amount: Number(b.amount || 0), stayDays: Number(b.stayDays || 0), status: ["pending","tracked","paid"].includes(b.status) ? b.status : "pending" })) : [],
+      bonuses: Array.isArray(f.bonuses) ? f.bonuses.map(b => ({ id: String(b.id || uid()), source: String(b.source || ""), amount: Number(b.amount || 0), stayDays: Number(b.stayDays || 0), paidOn: b.paidOn ? String(b.paidOn) : null, status: ["pending","tracked","paid"].includes(b.status) ? b.status : "pending" })) : [],
       notes: String(f.notes || ""), considering: !!f.considering,
       rates: f.rates && typeof f.rates === "object" ? { supply: f.rates.supply ?? null, peak: f.rates.peak ?? null, off: f.rates.off ?? null, fit: f.rates.fit ?? null } : null,
       createdAt: f.createdAt || new Date().toISOString(),
