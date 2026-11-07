@@ -1,0 +1,656 @@
+<title>Flip My Bird</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one narrow column, phone-first. The current deal leads, then money owed, then who you can go back to, then history. */
+:root {
+  --bg: #eef0f1;          /* galah grey, cool */
+  --surface: #ffffff;
+  --ink: #1f2428;
+  --muted: #5d666d;
+  --line: #d6dbde;
+  --accent: #d2466b;      /* galah pink */
+  --accent-ink: #ffffff;
+  --accent-soft: #fbe3ea;
+  --ok: #1f7a4d;   --ok-soft: #dcf1e5;
+  --wait: #9a5b00; --wait-soft: #fbedd5;
+  --stop: #b3261e; --stop-soft: #fadedb;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15191c; --surface: #1e2428; --ink: #e9ecee; --muted: #9aa4ab; --line: #333b41;
+  --accent: #f07393; --accent-ink: #1b0d12; --accent-soft: #3c2129;
+  --ok: #6fd19c; --ok-soft: #173326; --wait: #f2b95e; --wait-soft: #3a2c14; --stop: #f28b82; --stop-soft: #3d1f1d;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #15191c; --surface: #1e2428; --ink: #e9ecee; --muted: #9aa4ab; --line: #333b41;
+  --accent: #f07393; --accent-ink: #1b0d12; --accent-soft: #3c2129;
+  --ok: #6fd19c; --ok-soft: #173326; --wait: #f2b95e; --wait-soft: #3a2c14; --stop: #f28b82; --stop-soft: #3d1f1d;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); margin: 0; }
+.wrap { max-width: 640px; margin: 0 auto; padding-block: 20px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 28px; }
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand h1 { font: 800 26px/1 var(--display); letter-spacing: -0.02em; margin: 0; }
+.brand svg { width: 38px; height: 38px; flex: none; }
+.sync { font-size: 12px; color: var(--muted); }
+h2 { font: 700 13px/1.2 var(--body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0; }
+.sec { display: grid; gap: 12px; }
+.sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+button { font: 600 14px/1 var(--body); border-radius: 999px; padding: 11px 16px; cursor: pointer; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.ghost { background: transparent; border-color: transparent; color: var(--accent); padding-inline: 8px; }
+button.small { padding: 7px 12px; font-size: 13px; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* The current deal */
+.deal { background: var(--surface); border-radius: 18px; padding: 20px; display: grid; gap: 14px; border: 1px solid var(--line); }
+.deal .row1 { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.deal .who { font: 800 32px/1.05 var(--display); letter-spacing: -0.02em; text-wrap: balance; min-width: 0; overflow-wrap: anywhere; }
+.deal .meta { color: var(--muted); font-size: 14px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 var(--body); padding: 6px 10px; border-radius: 999px; white-space: nowrap; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.wait { background: var(--wait-soft); color: var(--wait); }
+.pill.stop { background: var(--stop-soft); color: var(--stop); }
+.pill.dim { background: var(--bg); color: var(--muted); }
+.big-count { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.big-count .n { font: 800 56px/0.9 var(--display); letter-spacing: -0.03em; }
+.big-count .u { font-size: 15px; color: var(--muted); }
+.track { height: 10px; background: var(--bg); border-radius: 999px; overflow: hidden; }
+.track > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.track.done > i { background: var(--ok); }
+.ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); gap: 8px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Money */
+.money { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 4px; }
+.tile .k { font-size: 12px; color: var(--muted); }
+.tile .v { font: 700 26px/1.1 var(--mono); font-variant-numeric: tabular-nums; }
+.list { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); }
+.item:first-child { border-top: 0; }
+.item .main { flex: 1; min-width: 0; }
+.item .t { font-weight: 600; overflow-wrap: anywhere; }
+.item .s { font-size: 13px; color: var(--muted); }
+.item .amt { font: 500 15px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.empty-line { padding: 14px 16px; color: var(--muted); font-size: 14px; }
+
+/* History */
+.hist .item { cursor: pointer; }
+.hist .item:hover { background: var(--bg); }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); flex: none; }
+.dot.on { background: var(--accent); }
+
+.empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 18px; padding: 24px 20px; display: grid; gap: 12px; }
+.empty p { margin: 0; color: var(--muted); max-width: 60ch; }
+.empty h3 { margin: 0; font: 700 22px/1.2 var(--display); }
+.note { font-size: 13px; color: var(--muted); }
+.banner { background: var(--accent-soft); border-radius: 12px; padding: 10px 14px; font-size: 13px; display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+/* Form sheet */
+dialog { border: 0; padding: 0; border-radius: 20px; width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
+  background: var(--surface); color: var(--ink); }
+dialog::backdrop { background: rgb(10 12 14 / 0.5); }
+form.sheet { display: grid; gap: 16px; padding: 20px; }
+form.sheet h3 { margin: 0; font: 800 22px/1.2 var(--display); }
+.field { display: grid; gap: 6px; min-width: 0; }
+.field label { font-size: 13px; font-weight: 600; }
+.field .hint { font-size: 12px; color: var(--muted); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+input, select, textarea { font: 15px var(--body); padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); width: 100%; min-width: 0; }
+textarea { min-height: 64px; resize: vertical; }
+.bonus-row { display: grid; grid-template-columns: 1.4fr 0.8fr 1fr auto; gap: 8px; align-items: center; }
+.bonus-row button { padding: 8px 10px; }
+.warn { background: var(--wait-soft); color: var(--wait); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.warn.stop { background: var(--stop-soft); color: var(--stop); }
+.form-actions { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.form-actions .r { display: flex; gap: 8px; margin-left: auto; }
+.confirm-del { color: var(--stop); }
+textarea.backup { font: 12px var(--mono); min-height: 120px; }
+
+@media (max-width: 460px) {
+  .grid2 { grid-template-columns: 1fr; }
+  .bonus-row { grid-template-columns: 1fr 1fr; }
+  .bonus-row .src { grid-column: 1 / -1; }
+  .deal .who { font-size: 28px; }
+  .big-count .n { font-size: 48px; }
+}
+@media (prefers-reduced-motion: no-preference) { .track > i { transition: width .6s ease; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="19" fill="var(--accent)"/>
+        <path d="M11 24c2-7 8-11 15-10l4-3-1 5c2 2 2 5 0 7-3 3-9 4-14 3l-5 3 1-5z" fill="var(--accent-ink)"/>
+        <circle cx="25" cy="17" r="1.6" fill="var(--accent)"/>
+        <path d="M8 13a9 9 0 0 1 9-6" stroke="var(--accent-ink)" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <path d="M17 4l1 3-3 1" stroke="var(--accent-ink)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <h1>Flip My Bird</h1>
+    </div>
+    <span class="sync" id="sync">Loading…</span>
+  </header>
+
+  <div id="example-banner" class="banner" hidden>
+    <span>You're looking at example deals. Nothing here is saved.</span>
+    <button class="small" id="exit-example">Back to my deals</button>
+  </div>
+
+  <section class="sec" id="now-sec">
+    <h2>Right now</h2>
+    <div id="now"></div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-head"><h2>Bonuses</h2></div>
+    <div class="money">
+      <div class="tile"><span class="k">Collected so far</span><span class="v" id="paid">$0</span></div>
+      <div class="tile"><span class="k">Still waiting on</span><span class="v" id="pending">$0</span></div>
+    </div>
+    <div class="list" id="pending-list"></div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-head"><h2>Who can I go back to?</h2></div>
+    <div class="list" id="cooldowns"></div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-head"><h2>Every flip</h2><button class="ghost small" id="add-past">+ Add a past deal</button></div>
+    <div class="list hist" id="history"></div>
+  </section>
+
+  <section class="sec">
+    <h2>Backup</h2>
+    <p class="note" style="margin:0" id="backup-note">Keep a copy of your deals, or move them to another device.</p>
+    <div class="actions">
+      <button class="small" id="dl-backup">Download backup</button>
+      <button class="small" id="copy-backup">Copy backup</button>
+      <button class="small" id="restore-open">Restore</button>
+    </div>
+  </section>
+</div>
+
+<dialog id="dlg">
+  <form class="sheet" id="form" novalidate>
+    <h3 id="form-title">Add a deal</h3>
+    <div id="form-warn"></div>
+    <div class="grid2">
+      <div class="field">
+        <label for="f-retailer">Energy company</label>
+        <input id="f-retailer" list="retailers" required autocomplete="off" placeholder="e.g. GloBird">
+      </div>
+      <div class="field">
+        <label for="f-fuel">What for</label>
+        <select id="f-fuel"><option>Electricity</option><option>Gas</option><option>Electricity + Gas</option></select>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label for="f-start">Started on</label>
+        <input id="f-start" type="date" required>
+      </div>
+      <div class="field">
+        <label for="f-end">Left on</label>
+        <input id="f-end" type="date">
+        <span class="hint">Leave blank if you're still with them.</span>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label for="f-stay">Must stay for (months)</label>
+        <input id="f-stay" type="number" min="0" max="36" step="1" value="3" inputmode="numeric">
+        <span class="hint">To keep the bonus. Usually 2–3.</span>
+      </div>
+      <div class="field">
+        <label for="f-noreturn">Can't come back for (months)</label>
+        <input id="f-noreturn" type="number" min="0" max="60" step="1" value="12" inputmode="numeric">
+        <span class="hint">After you leave. Often 12.</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>Bonuses for this deal</label>
+      <div id="bonus-rows" style="display:grid;gap:8px"></div>
+      <div><button type="button" class="small" id="add-bonus">+ Add bonus</button></div>
+    </div>
+    <div class="field">
+      <label for="f-notes">Notes</label>
+      <textarea id="f-notes" placeholder="Rate, account number, promo code, what the cashback T&amp;Cs said…"></textarea>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="ghost" id="del-btn" hidden>Delete</button>
+      <div class="r">
+        <button type="button" id="cancel-btn">Cancel</button>
+        <button type="submit" class="primary" id="save-btn">Save</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="restore-dlg">
+  <form class="sheet" id="restore-form">
+    <h3>Restore a backup</h3>
+    <p class="note" style="margin:0">Paste a backup, or choose the file you downloaded. Deals with the same id are replaced; others are added.</p>
+    <textarea class="backup" id="restore-text" placeholder='{"app":"flip-my-bird", ...}'></textarea>
+    <input type="file" id="restore-file" accept=".json,application/json">
+    <div id="restore-msg" class="note"></div>
+    <div class="form-actions"><div class="r">
+      <button type="button" id="restore-cancel">Cancel</button>
+      <button type="submit" class="primary">Restore</button>
+    </div></div>
+  </form>
+</dialog>
+
+<datalist id="retailers">
+  <option>AGL</option><option>Origin Energy</option><option>EnergyAustralia</option><option>Alinta Energy</option>
+  <option>Red Energy</option><option>Lumo Energy</option><option>Simply Energy</option><option>Powershop</option>
+  <option>Momentum Energy</option><option>Dodo</option><option>Tango Energy</option><option>GloBird Energy</option>
+  <option>OVO Energy</option><option>Amber Electric</option><option>1st Energy</option><option>ReAmped Energy</option>
+  <option>Sumo</option><option>Energy Locals</option><option>Nectr</option><option>CovaU</option>
+  <option>Kogan Energy</option><option>Powerclub</option><option>Diamond Energy</option><option>Engie</option>
+</datalist>
+<datalist id="sources">
+  <option>ShopBack</option><option>TopCashback</option><option>Econnex</option><option>Retailer sign-up credit</option>
+  <option>Referral</option><option>Cashrewards</option><option>Compare the Market</option><option>iSelect</option>
+</datalist>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  const LS_KEY = "flip-my-bird.v1";
+
+  // ---------- dates ----------
+  const pad = (n) => String(n).padStart(2, "0");
+  const toISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parse = (s) => { if (!s) return null; const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const today = () => { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); };
+  function addMonths(d, n) {
+    const day = d.getDate();
+    const r = new Date(d.getFullYear(), d.getMonth() + Number(n || 0), 1);
+    const last = new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate();
+    r.setDate(Math.min(day, last));
+    return r;
+  }
+  const daysBetween = (a, b) => Math.round((b - a) / 86400000);
+  const fmt = (d) => d ? d.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" }) : "";
+  const money = (n) => "$" + (Math.round(Number(n) || 0)).toLocaleString("en-AU");
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+  // ---------- derived ----------
+  const freeDate = (f) => addMonths(parse(f.start), f.stayMonths);
+  const returnDate = (f) => f.end ? addMonths(parse(f.end), f.noReturnMonths) : null;
+  const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+(energy|electric|power)$/, "");
+
+  // ---------- state & storage ----------
+  let flips = [];
+  let example = null;          // when showing example data
+  let store = null;            // { mode, save, remove }
+  let dl = null;               // downloads namespace
+  const data = () => example || flips;
+
+  function sortFlips(arr) { return arr.slice().sort((a, b) => (b.start || "").localeCompare(a.start || "")); }
+
+  function localStore() {
+    try { flips = JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { flips = []; }
+    const persist = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(flips)); } catch {} };
+    return {
+      mode: "local",
+      async save(f) { flips = flips.filter(x => x.id !== f.id).concat(f); persist(); render(); },
+      async remove(id) { flips = flips.filter(x => x.id !== id); persist(); render(); },
+    };
+  }
+
+  async function boot() {
+    render();
+    const c = window.claude;
+    const db = c && c.use ? await c.use("db").catch(() => null) : null;
+    if (c && c.use) dl = await c.use("downloads").catch(() => null);
+    if (!db) {
+      store = localStore();
+      setSync("Saved on this device only");
+      $("#backup-note").textContent = "Your deals are saved in this browser only. Download a backup now and then so you don't lose them.";
+      render();
+      return;
+    }
+    const col = db.collection("flips");
+    let timer = setTimeout(() => setSync("Can't reach your saved deals yet…"), 10000);
+    col.onSnapshot((snap) => {
+      flips = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+      if (!snap.metadata.fromCache) { clearTimeout(timer); setSync("Saved to your account"); $("#backup-note").textContent = "Your deals save to your account automatically. You can also keep a copy."; }
+      render();
+    }, (e) => { clearTimeout(timer); setSync(e.code === "revoked" ? "Saving is off for this view" : "Couldn't load saved deals"); });
+    store = {
+      mode: "db",
+      async save(f) { await col.doc(f.id).set(f); },
+      async remove(id) { await col.doc(id).delete(); },
+    };
+  }
+  function setSync(t) { $("#sync").textContent = t; }
+
+  // ---------- render ----------
+  function render() {
+    const all = sortFlips(data());
+    $("#example-banner").hidden = !example;
+    renderNow(all);
+    renderMoney(all);
+    renderCooldowns(all);
+    renderHistory(all);
+  }
+
+  function renderNow(all) {
+    const el = $("#now");
+    const active = all.filter(f => !f.end);
+    if (!all.length) {
+      el.innerHTML = `<div class="empty">
+        <h3>Who are you with right now?</h3>
+        <p>Add your current energy deal and the bonuses you're chasing. Flip My Bird counts down to the day you can switch without losing the bonus, and remembers which companies won't take you back yet.</p>
+        <div class="actions"><button class="primary" data-act="add">Add my current deal</button><button data-act="example">Show me an example</button></div>
+      </div>`;
+      return;
+    }
+    if (!active.length) {
+      el.innerHTML = `<div class="empty">
+        <h3>No current deal tracked</h3>
+        <p>Your last deal has an end date. Add the company you're with now.</p>
+        <div class="actions"><button class="primary" data-act="add">Add current deal</button></div>
+      </div>`;
+      return;
+    }
+    const t = today();
+    el.innerHTML = active.map(f => {
+      const start = parse(f.start), free = freeDate(f);
+      const total = Math.max(1, daysBetween(start, free));
+      const gone = Math.min(total, Math.max(0, daysBetween(start, t)));
+      const left = daysBetween(t, free);
+      const done = left <= 0;
+      const pct = Math.round((gone / total) * 100);
+      const pill = done ? `<span class="pill ok">Free to flip</span>`
+        : left <= 14 ? `<span class="pill wait">Nearly there</span>` : `<span class="pill dim">Staying put</span>`;
+      const count = done
+        ? `<div class="big-count"><span class="n">Go</span><span class="u">You've done your ${f.stayMonths} months since ${esc(fmt(free))}. Time to find the next bonus.</span></div>`
+        : `<div class="big-count"><span class="n num">${left}</span><span class="u">${left === 1 ? "day" : "days"} until you can flip, on <strong>${esc(fmt(free))}</strong></span></div>`;
+      const pend = (f.bonuses || []).filter(b => b.status !== "paid").reduce((s, b) => s + Number(b.amount || 0), 0);
+      return `<div class="deal">
+        <div class="row1">
+          <div style="min-width:0">
+            <div class="who">${esc(f.retailer)}</div>
+            <div class="meta">${esc(f.fuel)} · since ${esc(fmt(start))}${pend ? ` · <span class="num">${money(pend)}</span> bonus pending` : ""}</div>
+          </div>
+          ${pill}
+        </div>
+        ${count}
+        <div><div class="track ${done ? "done" : ""}"><i style="width:${pct}%"></i></div>
+          <div class="ends"><span>${esc(fmt(start))}</span><span>${f.stayMonths} month stay</span><span>${esc(fmt(free))}</span></div></div>
+        <div class="actions">
+          <button class="primary" data-act="flip" data-id="${esc(f.id)}">I've flipped</button>
+          <button data-act="edit" data-id="${esc(f.id)}">Edit deal</button>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderMoney(all) {
+    let paid = 0, pending = 0; const rows = [];
+    for (const f of all) for (const b of (f.bonuses || [])) {
+      const a = Number(b.amount || 0);
+      if (b.status === "paid") paid += a;
+      else { pending += a; rows.push({ f, b }); }
+    }
+    $("#paid").textContent = money(paid);
+    $("#pending").textContent = money(pending);
+    const label = { pending: "Not tracked yet", tracked: "Tracked, waiting to pay" };
+    $("#pending-list").innerHTML = rows.length ? rows.map(({ f, b }) => `
+      <div class="item">
+        <div class="main"><div class="t">${esc(b.source || "Bonus")}</div>
+          <div class="s">${esc(f.retailer)} · ${esc(label[b.status] || "Waiting")}</div></div>
+        <span class="amt">${money(b.amount)}</span>
+        <button class="small" data-act="paid" data-id="${esc(f.id)}" data-b="${esc(b.id)}">Paid</button>
+      </div>`).join("")
+      : `<div class="empty-line">${all.length ? "Nothing outstanding. Every bonus has landed." : "Bonuses you're owed show up here until they're paid."}</div>`;
+  }
+
+  function renderCooldowns(all) {
+    const t = today();
+    const by = new Map();  // latest deal per retailer
+    for (const f of all) {
+      const k = norm(f.retailer);
+      const cur = by.get(k);
+      if (!cur || (f.start || "") > (cur.start || "")) by.set(k, f);
+    }
+    const rows = [...by.values()].map(f => {
+      if (!f.end) return { f, rank: 0, pill: `<span class="pill dim">With them now</span>`, s: `Joined ${fmt(parse(f.start))}` };
+      const back = returnDate(f);
+      const left = daysBetween(t, back);
+      if (left > 0) return { f, rank: 1, sortKey: left, pill: `<span class="pill stop">Not yet</span>`, s: `Back from ${fmt(back)} · ${left} days` };
+      return { f, rank: 2, pill: `<span class="pill ok">Can go back</span>`, s: `Left ${fmt(parse(f.end))}` };
+    }).sort((a, b) => a.rank - b.rank || (a.sortKey || 0) - (b.sortKey || 0));
+    $("#cooldowns").innerHTML = rows.length ? rows.map(r => `
+      <div class="item"><div class="main"><div class="t">${esc(r.f.retailer)}</div><div class="s">${esc(r.s)}</div></div>${r.pill}</div>`).join("")
+      : `<div class="empty-line">Companies you've been with show here, with the date each one will take you back.</div>`;
+  }
+
+  function renderHistory(all) {
+    $("#history").innerHTML = all.length ? all.map(f => {
+      const bonus = (f.bonuses || []).reduce((s, b) => s + Number(b.amount || 0), 0);
+      const span = `${fmt(parse(f.start))} – ${f.end ? fmt(parse(f.end)) : "now"}`;
+      const months = f.end ? Math.max(0, Math.round(daysBetween(parse(f.start), parse(f.end)) / 30.44)) : null;
+      return `<div class="item" data-act="edit" data-id="${esc(f.id)}" role="button" tabindex="0">
+        <span class="dot ${f.end ? "" : "on"}"></span>
+        <div class="main"><div class="t">${esc(f.retailer)}</div><div class="s">${esc(span)}${months !== null ? ` · ${months} mo` : ""} · ${esc(f.fuel)}</div></div>
+        <span class="amt">${bonus ? money(bonus) : "–"}</span>
+      </div>`;
+    }).join("") : `<div class="empty-line">Each switch you make lands here, newest first.</div>`;
+  }
+
+  // ---------- form ----------
+  const dlg = $("#dlg"), form = $("#form");
+  let editing = null;   // id being edited
+  let flipFrom = null;  // id of the deal being left when using "I've flipped"
+  let delArmed = false;
+
+  function bonusRow(b = {}) {
+    const row = document.createElement("div");
+    row.className = "bonus-row";
+    row.dataset.id = b.id || uid();
+    row.innerHTML = `
+      <input class="src" list="sources" placeholder="Where from (ShopBack…)" aria-label="Bonus from" value="${esc(b.source || "")}">
+      <input class="amt-in" type="number" min="0" step="1" inputmode="decimal" placeholder="$" aria-label="Amount in dollars" value="${esc(b.amount ?? "")}">
+      <select class="st" aria-label="Status">
+        <option value="pending">Not tracked yet</option><option value="tracked">Tracked</option><option value="paid">Paid</option>
+      </select>
+      <button type="button" aria-label="Remove bonus">✕</button>`;
+    row.querySelector(".st").value = b.status || "pending";
+    row.querySelector("button").onclick = () => row.remove();
+    $("#bonus-rows").appendChild(row);
+  }
+
+  function openForm({ deal = null, from = null, past = false } = {}) {
+    editing = deal ? deal.id : null;
+    flipFrom = from ? from.id : null;
+    delArmed = false;
+    const d = deal || {};
+    $("#form-title").textContent = deal ? "Edit deal" : from ? `Flipping from ${from.retailer}` : past ? "Add a past deal" : "Add a deal";
+    $("#f-retailer").value = d.retailer || "";
+    $("#f-fuel").value = d.fuel || (from && from.fuel) || "Electricity";
+    $("#f-start").value = d.start || toISO(today());
+    $("#f-end").value = d.end || "";
+    $("#f-stay").value = d.stayMonths ?? 3;
+    $("#f-noreturn").value = d.noReturnMonths ?? 12;
+    $("#f-notes").value = d.notes || "";
+    $("#bonus-rows").innerHTML = "";
+    (d.bonuses && d.bonuses.length ? d.bonuses : [{}]).forEach(bonusRow);
+    const del = $("#del-btn"); del.hidden = !deal; del.textContent = "Delete"; del.classList.remove("confirm-del");
+    $("#save-btn").textContent = from ? "Save new deal" : "Save";
+    updateWarn();
+    dlg.showModal();
+    if (!deal) $("#f-retailer").focus();
+  }
+
+  function updateWarn() {
+    const msgs = [];
+    const name = norm($("#f-retailer").value);
+    const start = parse($("#f-start").value);
+    if (name && start) {
+      for (const f of data()) {
+        if (f.id === editing || !f.end || norm(f.retailer) !== name) continue;
+        const back = returnDate(f);
+        if (back > start) msgs.push(`<div class="warn stop">You left ${esc(f.retailer)} on ${esc(fmt(parse(f.end)))}. They may not give you a new-customer bonus until ${esc(fmt(back))}.</div>`);
+      }
+    }
+    if (flipFrom && start) {
+      const from = data().find(f => f.id === flipFrom);
+      if (from && freeDate(from) > start)
+        msgs.push(`<div class="warn">Heads up: your ${esc(from.retailer)} stay isn't done until ${esc(fmt(freeDate(from)))}. Leaving earlier could lose that bonus.</div>`);
+    }
+    $("#form-warn").innerHTML = msgs.join("");
+  }
+  ["#f-retailer", "#f-start"].forEach(s => $(s).addEventListener("input", updateWarn));
+
+  function readForm() {
+    const retailer = $("#f-retailer").value.trim();
+    const start = $("#f-start").value;
+    if (!retailer) { $("#f-retailer").focus(); return null; }
+    if (!start) { $("#f-start").focus(); return null; }
+    const old = data().find(f => f.id === editing) || {};
+    const bonuses = [...document.querySelectorAll("#bonus-rows .bonus-row")].map(r => ({
+      id: r.dataset.id,
+      source: r.querySelector(".src").value.trim(),
+      amount: Number(r.querySelector(".amt-in").value || 0),
+      status: r.querySelector(".st").value,
+    })).filter(b => b.source || b.amount);
+    return {
+      id: editing || uid(),
+      retailer, start,
+      fuel: $("#f-fuel").value,
+      end: $("#f-end").value || null,
+      stayMonths: Math.max(0, Number($("#f-stay").value || 0)),
+      noReturnMonths: Math.max(0, Number($("#f-noreturn").value || 0)),
+      bonuses,
+      notes: $("#f-notes").value.trim(),
+      createdAt: old.createdAt || new Date().toISOString(),
+    };
+  }
+
+  async function persist(f) {
+    if (example) { example = example.filter(x => x.id !== f.id).concat(f); render(); return; }
+    if (!store) return;
+    try { await store.save(f); } catch (e) { setSync(e && e.code === "quota_exceeded" ? "Storage is full" : "Couldn't save. Try again."); throw e; }
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = readForm(); if (!f) return;
+    $("#save-btn").disabled = true;
+    try {
+      if (flipFrom) {
+        const from = data().find(x => x.id === flipFrom);
+        if (from && !from.end) await persist({ ...from, end: f.start });
+      }
+      await persist(f);
+      dlg.close();
+    } catch {} finally { $("#save-btn").disabled = false; }
+  });
+  $("#cancel-btn").onclick = () => dlg.close();
+  $("#add-bonus").onclick = () => bonusRow();
+  $("#del-btn").onclick = async () => {
+    const b = $("#del-btn");
+    if (!delArmed) { delArmed = true; b.textContent = "Tap again to delete"; b.classList.add("confirm-del"); return; }
+    if (example) { example = example.filter(x => x.id !== editing); render(); }
+    else if (store) { try { await store.remove(editing); } catch { setSync("Couldn't delete. Try again."); } }
+    dlg.close();
+  };
+
+  // ---------- page actions ----------
+  document.addEventListener("click", async (e) => {
+    const t = e.target.closest("[data-act]"); if (!t) return;
+    const act = t.dataset.act, id = t.dataset.id;
+    const deal = id && data().find(f => f.id === id);
+    if (act === "add") openForm();
+    else if (act === "example") { example = sampleData(); render(); window.scrollTo({ top: 0 }); }
+    else if (act === "edit" && deal) openForm({ deal });
+    else if (act === "flip" && deal) openForm({ from: deal });
+    else if (act === "paid" && deal) {
+      const bonuses = deal.bonuses.map(b => b.id === t.dataset.b ? { ...b, status: "paid" } : b);
+      t.disabled = true;
+      try { await persist({ ...deal, bonuses }); } catch { t.disabled = false; }
+    }
+  });
+  $("#history").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { const r = e.target.closest("[data-act]"); if (r) { e.preventDefault(); r.click(); } } });
+  $("#add-past").onclick = () => openForm({ past: true });
+  $("#exit-example").onclick = () => { example = null; render(); };
+
+  // ---------- backup ----------
+  const backupJSON = () => JSON.stringify({ app: "flip-my-bird", version: 1, exportedAt: new Date().toISOString(), flips: data() }, null, 2);
+  $("#dl-backup").onclick = async () => {
+    if (!dl) { setSync("Download isn't available here. Use Copy backup."); return; }
+    try { await dl.save({ filename: `flip-my-bird-${toISO(today())}.json`, data: new Blob([backupJSON()], { type: "application/json" }) }); }
+    catch (e) { if (e && e.code !== "declined") setSync("Download isn't available here. Use Copy backup."); }
+  };
+  $("#copy-backup").onclick = async () => {
+    const btn = $("#copy-backup");
+    try { await navigator.clipboard.writeText(backupJSON()); btn.textContent = "Copied"; }
+    catch {
+      $("#restore-text").value = backupJSON(); $("#restore-msg").textContent = "Select all of this text and copy it.";
+      $("#restore-dlg").showModal(); $("#restore-text").select();
+    }
+    setTimeout(() => { btn.textContent = "Copy backup"; }, 2000);
+  };
+  $("#restore-open").onclick = () => { $("#restore-text").value = ""; $("#restore-msg").textContent = ""; $("#restore-dlg").showModal(); };
+  $("#restore-cancel").onclick = () => $("#restore-dlg").close();
+  $("#restore-file").onchange = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const r = new FileReader(); r.onload = () => { $("#restore-text").value = r.result; }; r.readAsText(file);
+  };
+  $("#restore-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    let list;
+    try { const j = JSON.parse($("#restore-text").value); list = Array.isArray(j) ? j : j.flips; if (!Array.isArray(list)) throw 0; }
+    catch { $("#restore-msg").textContent = "That doesn't look like a Flip My Bird backup. Paste the whole thing, from { to }."; return; }
+    const clean = list.filter(f => f && f.retailer && f.start).map(f => ({
+      id: String(f.id || uid()).replace(/[^A-Za-z0-9_\-.~:@+]/g, "").slice(0, 60) || uid(),
+      retailer: String(f.retailer), start: String(f.start), end: f.end ? String(f.end) : null,
+      fuel: String(f.fuel || "Electricity"), stayMonths: Number(f.stayMonths ?? 3), noReturnMonths: Number(f.noReturnMonths ?? 12),
+      bonuses: Array.isArray(f.bonuses) ? f.bonuses.map(b => ({ id: String(b.id || uid()), source: String(b.source || ""), amount: Number(b.amount || 0), status: ["pending","tracked","paid"].includes(b.status) ? b.status : "pending" })) : [],
+      notes: String(f.notes || ""), createdAt: f.createdAt || new Date().toISOString(),
+    }));
+    example = null;
+    try { for (const f of clean) await persist(f); $("#restore-dlg").close(); }
+    catch { $("#restore-msg").textContent = "Some deals couldn't be saved. Try again."; }
+  });
+
+  // ---------- example ----------
+  function sampleData() {
+    const t = today(), iso = (d) => toISO(d);
+    const s1 = addMonths(t, -14), e1 = addMonths(t, -10), e2 = addMonths(t, -5), s3 = addMonths(t, -5);
+    return [
+      { id: "ex1", retailer: "AGL", fuel: "Electricity", start: iso(s1), end: iso(e1), stayMonths: 3, noReturnMonths: 12,
+        bonuses: [{ id: "b1", source: "ShopBack", amount: 120, status: "paid" }], notes: "Example", createdAt: "" },
+      { id: "ex2", retailer: "Origin Energy", fuel: "Electricity", start: iso(e1), end: iso(e2), stayMonths: 3, noReturnMonths: 12,
+        bonuses: [{ id: "b2", source: "TopCashback", amount: 150, status: "paid" }, { id: "b3", source: "Retailer sign-up credit", amount: 50, status: "paid" }], notes: "Example", createdAt: "" },
+      { id: "ex3", retailer: "EnergyAustralia", fuel: "Electricity", start: iso(s3), end: iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 80)), stayMonths: 2, noReturnMonths: 12,
+        bonuses: [{ id: "b4", source: "Econnex", amount: 100, status: "tracked" }], notes: "Example", createdAt: "" },
+      { id: "ex4", retailer: "Red Energy", fuel: "Electricity", start: iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 80)), end: null, stayMonths: 3, noReturnMonths: 12,
+        bonuses: [{ id: "b5", source: "ShopBack", amount: 140, status: "tracked" }], notes: "Example", createdAt: "" },
+    ];
+  }
+
+  boot();
+})();
+</script>
