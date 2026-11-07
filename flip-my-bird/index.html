@@ -494,6 +494,24 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
   const isCurrent = (f) => isLive(f) && !f.end;
   // Current deals that clash with f (same fuel). You can only be with one company per fuel.
   const clashes = (f, list = data()) => list.filter(x => x.id !== f.id && isCurrent(x) && fuelsOverlap(x.fuel, f.fuel));
+  // What saving a current deal would do to the others. Stops duplicates and out-of-order switches.
+  function planSave(f) {
+    const block = [], notes = [], toEnd = [], toRemove = [];
+    const name = norm(f.retailer);
+    for (const x of data()) {
+      if (x.id === f.id) continue;
+      const same = name && norm(x.retailer) === name && fuelsOverlap(x.fuel, f.fuel);
+      if (same && x.considering) { toRemove.push(x); notes.push(`This replaces the ${esc(x.retailer)} deal in "considering", so it isn't counted twice.`); continue; }
+      if (same && !x.considering && (!x.end || x.end > f.start)) {
+        block.push(`You already have a ${esc(x.retailer)} deal from ${esc(fmt(parse(x.start)))}. Edit that one instead of adding another, or delete one of them.`); continue;
+      }
+      if (isCurrent(x) && fuelsOverlap(x.fuel, f.fuel)) {
+        if (x.start >= f.start) block.push(`Your ${esc(x.retailer)} deal starts on ${esc(fmt(parse(x.start)))}, after this one. Check the dates, or mark one as "One I've already left".`);
+        else { toEnd.push(x); notes.push(`You're marked as with ${esc(x.retailer)} now. Saving will end that deal on ${esc(fmt(parse(f.start)))}. If you haven't switched yet, choose "One I'm thinking about" above.`); }
+      }
+    }
+    return { block, notes, toEnd, toRemove };
+  }
   const returnDate = (f) => f.end ? addMonths(parse(f.end), f.noReturnMonths) : null;
   const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+(energy|electric|power)$/, "");
 
@@ -941,13 +959,11 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
 
   function updateWarn() {
     const msgs = [];
-    if ($("#f-kind").value === "current") {
-      const draft = { id: editing, fuel: $("#f-fuel").value };
-      for (const c of clashes(draft)) {
-        const startV = $("#f-start").value;
-        msgs.push(`<div class="warn">You're marked as with ${esc(c.retailer)} now. Saving will end that deal on ${esc(fmt(parse(startV)) || "the start date")}. If you haven't switched yet, choose "One I'm thinking about" above.</div>`);
-      }
-    }
+    if ($("#f-kind").value === "current" && $("#f-start").value) {
+      const plan = planSave({ id: editing, retailer: $("#f-retailer").value, fuel: $("#f-fuel").value, start: $("#f-start").value, end: null, considering: false });
+      msgs.push(...plan.block.map(m => `<div class="warn stop">${m}</div>`), ...plan.notes.map(m => `<div class="warn">${m}</div>`));
+      $("#save-btn").disabled = plan.block.length > 0;
+    } else $("#save-btn").disabled = false;
     const name = norm($("#f-retailer").value);
     const start = parse($("#f-start").value);
     if (name && start) {
@@ -1023,7 +1039,12 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     $("#save-btn").disabled = true;
     try {
       if (isCurrent(f)) {
-        for (const c of clashes(f)) await persist({ ...c, end: c.start > f.start ? c.start : f.start });
+        const plan = planSave(f);
+        if (plan.block.length) { updateWarn(); return; }
+        for (const c of plan.toEnd) await persist({ ...c, end: f.start });
+        for (const x of plan.toRemove) {
+          if (example) example = example.filter(e => e.id !== x.id); else if (store) await store.remove(x.id);
+        }
       }
       await persist(f);
       dlg.close();
