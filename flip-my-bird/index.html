@@ -7,6 +7,7 @@
 /* Layout: one narrow column, phone-first. The current deal leads, then money owed, then who you can go back to, then history. */
 :root {
   --s-recv: #c23a5f; --s-owed: #e88aa3; --s-plan: #f6cfda;
+  --t-retailer: #c23a5f; --t-econnex: #2a78d6; --t-cashback: #d98a00; --t-other: #8a949b;
   --bg: #eef0f1;          /* galah grey, cool */
   --surface: #ffffff;
   --ink: #1f2428;
@@ -24,12 +25,12 @@
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #15191c; --surface: #1e2428; --ink: #e9ecee; --muted: #9aa4ab; --line: #333b41;
-  --accent: #f07393; --accent-ink: #1b0d12; --accent-soft: #3c2129; --s-recv: #f07393; --s-owed: #a85068; --s-plan: #5a2f3b;
+  --accent: #f07393; --accent-ink: #1b0d12; --accent-soft: #3c2129; --s-recv: #f07393; --s-owed: #a85068; --s-plan: #5a2f3b; --t-retailer: #d95b80; --t-econnex: #3987e5; --t-cashback: #c98500; --t-other: #6b757c;
   --ok: #6fd19c; --ok-soft: #173326; --wait: #f2b95e; --wait-soft: #3a2c14; --stop: #f28b82; --stop-soft: #3d1f1d;
   color-scheme: dark; } }
 :root[data-theme="dark"] {
   --bg: #15191c; --surface: #1e2428; --ink: #e9ecee; --muted: #9aa4ab; --line: #333b41;
-  --accent: #f07393; --accent-ink: #1b0d12; --accent-soft: #3c2129; --s-recv: #f07393; --s-owed: #a85068; --s-plan: #5a2f3b;
+  --accent: #f07393; --accent-ink: #1b0d12; --accent-soft: #3c2129; --s-recv: #f07393; --s-owed: #a85068; --s-plan: #5a2f3b; --t-retailer: #d95b80; --t-econnex: #3987e5; --t-cashback: #c98500; --t-other: #6b757c;
   --ok: #6fd19c; --ok-soft: #173326; --wait: #f2b95e; --wait-soft: #3a2c14; --stop: #f28b82; --stop-soft: #3d1f1d;
   color-scheme: dark; }
 
@@ -180,6 +181,12 @@ details.more[open] > summary { margin-bottom: 10px; }
 .tbl th { color: var(--muted); font-weight: 600; }
 .deal .summary { font-size: 14px; color: var(--muted); }
 .deal .summary strong { color: var(--ink); font-family: var(--mono); font-weight: 500; }
+.slot-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+.slot-head i, .chip i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 5px 9px; border-radius: 999px; background: var(--bg); color: var(--ink); }
+.chip.none { color: var(--muted); }
+.chip .num { font-size: 12px; }
 .reqs { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
 .req { display: flex; gap: 10px; align-items: baseline; font-size: 14px; flex-wrap: wrap; }
 .req .what { flex: 1; min-width: 0; }
@@ -242,9 +249,10 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
         </div>
       </div>
       <div class="legend" aria-hidden="true">
-        <span class="key"><i style="background:var(--s-recv)"></i>Received</span>
-        <span class="key"><i style="background:var(--s-owed)"></i>On the way (deals you're on)</span>
-        <span class="key"><i style="background:var(--s-plan)"></i>Planned (deals you're considering)</span>
+        <span class="key"><i style="background:var(--t-retailer)"></i>Retailer</span>
+        <span class="key"><i style="background:var(--t-econnex)"></i>Econnex</span>
+        <span class="key"><i style="background:var(--t-cashback)"></i>Cashback site</span>
+        <span class="key"><i style="background:var(--t-other);opacity:.4"></i>Faded = not paid yet</span>
         <span class="key"><i class="line"></i>Running total</span>
       </div>
       <div class="chart" id="chart"></div>
@@ -366,9 +374,9 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     </div>
     <div class="field">
       <label>Bonuses for this deal</label>
-      <span class="hint">Cashback sites have their own stay rule, often 30–90 days from when you're connected. Put it in "stay days". Your countdown waits for whichever rule ends last.</span>
+      <span class="hint">Check all three for every flip: the energy company, Econnex and a cashback site. Leave the amount blank if there isn't one. Each can have its own stay rule, and your countdown waits for whichever ends last.</span>
       <div id="bonus-rows" style="display:grid;gap:8px"></div>
-      <div><button type="button" class="small" id="add-bonus">+ Add bonus</button></div>
+      <div><button type="button" class="small" id="add-bonus">+ Another bonus</button></div>
     </div>
     <div class="field">
       <label for="f-notes">Notes</label>
@@ -442,7 +450,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     const start = parse(f.start);
     const rules = [{ label: `${f.retailer} plan`, detail: `${f.stayMonths} month${f.stayMonths == 1 ? "" : "s"}`, date: addMonths(start, f.stayMonths), source: null }];
     for (const b of (f.bonuses || [])) if (Number(b.stayDays) > 0)
-      rules.push({ label: b.source || "Bonus", detail: `${b.stayDays} days`, date: addDays(start, b.stayDays), source: b.source || "" });
+      rules.push({ label: bonusLabel(b), detail: `${b.stayDays} days`, date: addDays(start, b.stayDays), source: bonusType(b) === "retailer" ? "sign up bonus" : bonusType(b) === "econnex" ? "Econnex" : (b.source || "cashback") });
     return rules.sort((a, b) => a.date - b.date);
   }
   const freeDate = (f) => stayRules(f).reduce((m, r) => r.date > m ? r.date : m, parse(f.start));
@@ -511,6 +519,40 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       }
     }
     return { block, notes, toEnd, toRemove };
+  }
+  // Every flip can earn up to three kinds of bonus. Older entries are sorted into a kind by name.
+  const TYPES = [
+    { id: "retailer", name: "Retailer bonus", hint: "Sign-up credit from the energy company" },
+    { id: "econnex", name: "Econnex", hint: "Reward for switching through Econnex" },
+    { id: "cashback", name: "Cashback site", hint: "ShopBack, TopCashback, Cashrewards…" },
+  ];
+  function bonusType(b) {
+    if (b.type) return b.type;
+    const k = String(b.source || "").toLowerCase();
+    if (/shopback|topcashback|cashrewards|cash ?back/.test(k)) return "cashback";
+    if (k.includes("econnex")) return "econnex";
+    if (/retailer|sign.?up|credit|supplier|vendor/.test(k)) return "retailer";
+    return "other";
+  }
+  function bonusLabel(b) {
+    const t = bonusType(b);
+    if (t === "retailer") return "Retailer bonus";
+    if (t === "econnex") return "Econnex";
+    if (t === "cashback") return b.source && !/^cash ?back( site)?$/i.test(b.source) ? b.source : "Cashback site";
+    return b.source || "Other bonus";
+  }
+  function bonusChips(f) {
+    const bs = f.bonuses || [];
+    const chips = TYPES.map(t => {
+      const items = bs.filter(b => bonusType(b) === t.id && Number(b.amount) > 0);
+      const amt = items.reduce((s, b) => s + Number(b.amount), 0);
+      const paid = items.length && items.every(b => b.status === "paid");
+      return amt ? `<span class="chip"><i style="background:var(--t-${t.id})"></i>${esc(t.name)} <span class="num">${money(amt)}</span>${paid ? " ✓" : ""}</span>`
+        : `<span class="chip none"><i style="background:var(--t-${t.id});opacity:.35"></i>${esc(t.name)}: none</span>`;
+    });
+    for (const b of bs.filter(b => bonusType(b) === "other" && Number(b.amount) > 0))
+      chips.push(`<span class="chip"><i style="background:var(--t-other)"></i>${esc(bonusLabel(b))} <span class="num">${money(b.amount)}</span></span>`);
+    return `<div class="chips">${chips.join("")}</div>`;
   }
   const returnDate = (f) => f.end ? addMonths(parse(f.end), f.noReturnMonths) : null;
   const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+(energy|electric|power)$/, "");
@@ -635,6 +677,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
           </div>
           ${pill}
         </div>
+        ${bonusChips(f)}
         ${count}
         <div><div class="track ${done ? "done" : ""}"><i style="width:${pct}%"></i></div>
           <div class="ends"><span>${esc(fmt(start))}</span><span>${esc(fmt(free))}</span></div></div>
@@ -690,6 +733,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       return `<div class="idea">
         <div class="row1"><div style="min-width:0"><div class="name">${esc(f.retailer)}</div>
           <div class="meta note">${esc(f.fuel)}${bonus ? ` · ${money(bonus)} in bonuses` : ""}${f.rates && f.rates.supply != null ? ` · supply ${m2(Number(f.rates.supply))}/day` : ""}</div></div>${pill}</div>
+        ${bonusChips(f)}
         ${block}${verdict}
         <div class="actions">
           <button class="primary small" data-act="switch" data-id="${esc(f.id)}">I've switched to this</button>
@@ -715,7 +759,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
           date = Number(b.stayDays) > 0 ? addDays(start, b.stayDays) : addMonths(start, f.stayMonths || 0);
           if (date < t) date = t;
         }
-        out.push({ kind, date, amount, source: b.source || "Bonus", retailer: f.retailer });
+        out.push({ kind, date, amount, type: bonusType(b), source: bonusLabel(b), retailer: f.retailer });
       }
     }
     return out.sort((a, b) => a.date - b.date);
@@ -728,9 +772,9 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     const end = last > t ? last : t;
     const months = [];
     for (let d = new Date(first.getFullYear(), first.getMonth(), 1); d <= end; d = new Date(d.getFullYear(), d.getMonth() + 1, 1))
-      months.push({ d, key: monthKey(d), recv: 0, owed: 0, plan: 0, items: [] });
-    for (const e of events) { const m = months.find(x => x.key === monthKey(e.date)); if (m) { m[e.kind] += e.amount; m.items.push(e); } }
-    let run = 0; for (const m of months) { run += m.recv + m.owed + m.plan; m.cum = run; }
+      months.push({ d, key: monthKey(d), recv: 0, owed: 0, plan: 0, total: 0, items: [] });
+    for (const e of events) { const m = months.find(x => x.key === monthKey(e.date)); if (m) { m[e.kind] += e.amount; m.total += e.amount; m.items.push(e); } }
+    let run = 0; for (const m of months) { run += m.total; m.cum = run; }
     return months.slice(-24);
   }
 
@@ -747,8 +791,10 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     lastMonths = monthsOf(ev);
     drawChart();
     const ms = lastMonths;
-    $("#chart-table").innerHTML = ms.length ? `<table class="tbl"><thead><tr><th>Month</th><th>Received</th><th>On the way</th><th>Planned</th><th>Running total</th></tr></thead><tbody>${
-      ms.map(m => `<tr><td>${esc(m.d.toLocaleDateString("en-AU", { month: "short", year: "numeric" }))}</td><td>${m.recv ? money(m.recv) : "–"}</td><td>${m.owed ? money(m.owed) : "–"}</td><td>${m.plan ? money(m.plan) : "–"}</td><td>${money(m.cum)}</td></tr>`).join("")}</tbody></table>` : "";
+    const st = { recv: "Received", owed: "On the way", plan: "Planned" };
+    let run = 0;
+    $("#chart-table").innerHTML = ev.length ? `<table class="tbl"><thead><tr><th>Month</th><th>Bonus</th><th>Deal</th><th>Status</th><th>Amount</th><th>Total</th></tr></thead><tbody>${
+      ev.map(e => { run += e.amount; return `<tr><td>${esc(e.date.toLocaleDateString("en-AU", { month: "short", year: "2-digit" }))}</td><td>${esc(e.source)}</td><td>${esc(e.retailer)}</td><td>${st[e.kind]}</td><td>${money(e.amount)}</td><td>${money(run)}</td></tr>`; }).join("")}</tbody></table>` : "";
   }
 
   function drawChart() {
@@ -767,20 +813,24 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       g += `<line x1="${L}" x2="${W - Rp}" y1="${yy}" y2="${yy}" stroke="var(--line)" stroke-width="1"/>`;
       g += `<text x="${L - 8}" y="${yy + 4}" text-anchor="end">${money(v)}</text>`;
     }
-    const seg = (x, y0, y1, fill, top) => {
+    const seg = (x, y0, y1, fill, top, faded) => {
       const h = y0 - y1; if (h <= 0) return "";
       const r = top ? Math.min(4, h, bw / 2) : 0;
-      return `<path fill="${fill}" d="M${x},${y0} V${y1 + r} Q${x},${y1} ${x + r},${y1} H${x + bw - r} Q${x + bw},${y1} ${x + bw},${y1 + r} V${y0} Z"/>`;
+      return `<path fill="${fill}"${faded ? ' fill-opacity="0.4"' : ""} d="M${x},${y0} V${y1 + r} Q${x},${y1} ${x + r},${y1} H${x + bw - r} Q${x + bw},${y1} ${x + bw},${y1 + r} V${y0} Z"/>`;
     };
     let bars = "", labels = "";
     ms.forEach((m, i) => {
       const x = cx(i) - bw / 2;
-      const parts = [["recv", "var(--s-recv)"], ["owed", "var(--s-owed)"], ["plan", "var(--s-plan)"]].filter(([k]) => m[k] > 0);
+      const parts = [];
+      for (const t of ["retailer", "econnex", "cashback", "other"]) for (const paid of [true, false]) {
+        const v = m.items.filter(e => e.type === t && (e.kind === "recv") === paid).reduce((s, e) => s + e.amount, 0);
+        if (v > 0) parts.push({ v, fill: `var(--t-${t})`, faded: !paid });
+      }
       let base = 0;
-      parts.forEach(([k, fill], j) => {
-        const y0 = y(base) - (j ? 2 : 0), y1 = y(base + m[k]);
-        bars += seg(x, y0, y1, fill, j === parts.length - 1);
-        base += m[k];
+      parts.forEach((pt, j) => {
+        const y0 = y(base) - (j ? 2 : 0), y1 = y(base + pt.v);
+        bars += seg(x, y0, y1, pt.fill, j === parts.length - 1, pt.faded);
+        base += pt.v;
       });
       const showLabel = ms.length <= 8 || i % Math.ceil(ms.length / 8) === 0 || m.key === nowKey;
       if (showLabel) {
@@ -791,7 +841,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     // Step line: flat between months, rising where money lands.
     const pts = ms.map((m, i) => `${i ? `${cx(i)},${y(ms[i - 1].cum)} ` : ""}${cx(i)},${y(m.cum)}`).join(" ");
     const li = ms.length - 1, lx = cx(li), ly = y(ms[li].cum);
-    const svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Bonuses by month, stacked by received, on the way and planned, with a running total line reaching ${money(ms[li].cum)}">
+    const svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Bonuses by month, stacked by retailer, Econnex and cashback, unpaid ones faded, with a running total line reaching ${money(ms[li].cum)}">
       ${g}${bars}
       <polyline points="${pts}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
       <circle cx="${lx}" cy="${ly}" r="4" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/>
@@ -805,7 +855,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     const show = (i) => {
       const m = ms[i]; if (!m) return;
       const row = (k, v) => `<div class="r"><span>${k}</span><span>${money(v)}</span></div>`;
-      tip.innerHTML = `<div class="h">${esc(m.d.toLocaleDateString("en-AU", { month: "long", year: "numeric" }))}</div>${m.items.map(e => `<div class="r"><span>${esc(e.source)} · ${esc(e.retailer)}</span><span>${money(e.amount)}</span></div>`).join("") || '<div class="r"><span>No bonuses this month</span><span></span></div>'}${row("Running total", m.cum)}`;
+      tip.innerHTML = `<div class="h">${esc(m.d.toLocaleDateString("en-AU", { month: "long", year: "numeric" }))}</div>${m.items.map(e => `<div class="r"><span>${esc(e.source)} · ${esc(e.retailer)}${e.kind === "recv" ? "" : e.kind === "owed" ? " (on the way)" : " (planned)"}</span><span>${money(e.amount)}</span></div>`).join("") || '<div class="r"><span>No bonuses this month</span><span></span></div>'}${row("Running total", m.cum)}`;
       tip.hidden = false;
       const sx = el.clientWidth / W, px = cx(i) * sx;
       const tw = tip.offsetWidth;
@@ -845,7 +895,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     const label = { pending: "Not tracked yet", tracked: "Tracked, waiting to pay" };
     $("#pending-list").innerHTML = rows.length ? rows.map(({ f, b }) => `
       <div class="item">
-        <div class="main"><div class="t">${esc(b.source || "Bonus")}</div>
+        <div class="main"><div class="t"><span class="chip" style="padding:0;background:none"><i style="background:var(--t-${bonusType(b)})"></i>${esc(bonusLabel(b))}</span></div>
           <div class="s">${esc(f.retailer)} · ${esc(label[b.status] || "Waiting")}${Number(b.stayDays) > 0 ? ` · stay until ${esc(fmt(addDays(parse(f.start), b.stayDays)))}` : ""}</div></div>
         <span class="amt">${money(b.amount)}</span>
         <button class="small" data-act="paid" data-id="${esc(f.id)}" data-b="${esc(b.id)}">Paid</button>
@@ -892,30 +942,47 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
   let flipFrom = null;  // id of the deal being left when using "I've flipped"
   let delArmed = false;
 
-  function bonusRow(b = {}) {
+  function bonusRow(b = {}, type = null) {
+    const t = type || bonusType(b);
+    const fixed = TYPES.find(x => x.id === t);
     const row = document.createElement("div");
     row.className = "bonus-row";
     row.dataset.id = b.id || uid();
+    row.dataset.type = t;
     if (b.paidOn) row.dataset.paidOn = b.paidOn;
     if (b.status === "paid") row.dataset.wasPaid = "1";
+    const srcVal = t === "cashback" ? (b.source && !/^cash ?back( site)?$/i.test(b.source) ? b.source : "") : t === "other" ? (b.source || "") : "";
     row.innerHTML = `
-      <input class="src" list="sources" placeholder="Where from (ShopBack…)" aria-label="Bonus from" value="${esc(b.source || "")}">
-      <input class="amt-in" type="number" min="0" step="1" inputmode="decimal" placeholder="$" aria-label="Amount in dollars" value="${esc(b.amount ?? "")}">
+      <div class="slot-head"><i style="background:var(--t-${t})"></i>${esc(fixed ? fixed.name : "Other bonus")}<span class="note" style="font-weight:400">${fixed ? esc(fixed.hint) : ""}</span></div>
+      ${t === "cashback" || t === "other" ? `<input class="src" list="sources" placeholder="${t === "cashback" ? "Which site (ShopBack…)" : "Where from"}" aria-label="Bonus from" value="${esc(srcVal)}">` : `<span class="src" hidden></span>`}
+      <input class="amt-in" type="number" min="0" step="1" inputmode="decimal" placeholder="$ none" aria-label="${esc(fixed ? fixed.name : "Bonus")} amount in dollars" value="${esc(b.amount || "")}">
       <select class="st" aria-label="Status">
         <option value="pending">Not tracked yet</option><option value="tracked">Tracked</option><option value="paid">Paid</option>
       </select>
       <label class="days-in">Stay <input type="number" min="0" max="730" step="1" inputmode="numeric" placeholder="–" aria-label="Days you must stay for this bonus" value="${esc(b.stayDays || "")}"> days</label>
-      <button type="button" aria-label="Remove bonus">✕</button>
+      ${fixed ? "<span></span>" : '<button type="button" aria-label="Remove bonus">✕</button>'}
       <div class="links"></div>`;
     row.querySelector(".st").value = b.status || "pending";
-    row.querySelector("button").onclick = () => row.remove();
+    const rm = row.querySelector("button"); if (rm) rm.onclick = () => row.remove();
     const links = () => {
-      const html = termsLinks(row.querySelector(".src").value, $("#f-retailer").value);
+      const srcEl = row.querySelector("input.src");
+      const src = t === "retailer" ? "sign up bonus" : t === "econnex" ? "Econnex" : (srcEl && srcEl.value) || (t === "cashback" ? "cashback" : "");
+      const html = termsLinks(src, $("#f-retailer").value);
       row.querySelector(".links").innerHTML = html ? `Check the stay rule: ${html}` : "";
     };
-    row.querySelector(".src").addEventListener("input", links);
+    const srcEl = row.querySelector("input.src"); if (srcEl) srcEl.addEventListener("input", links);
     row._links = links; links();
     $("#bonus-rows").appendChild(row);
+  }
+  function fillBonusSlots(bonuses = []) {
+    $("#bonus-rows").innerHTML = "";
+    const left = bonuses.slice();
+    for (const t of TYPES) {
+      const mine = left.filter(b => bonusType(b) === t.id);
+      if (!mine.length) bonusRow({}, t.id);
+      for (const b of mine) { bonusRow(b, t.id); left.splice(left.indexOf(b), 1); }
+    }
+    for (const b of left) bonusRow(b, "other");
   }
 
   function openForm({ deal = null, from = null, past = false, kind = null, switching = false } = {}) {
@@ -937,7 +1004,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     const r = d.rates || {};
     $("#r-supply").value = r.supply ?? ""; $("#r-peak").value = r.peak ?? ""; $("#r-off").value = r.off ?? ""; $("#r-fit").value = r.fit ?? "";
     $("#bonus-rows").innerHTML = "";
-    (d.bonuses && d.bonuses.length ? d.bonuses : [{}]).forEach(bonusRow);
+    fillBonusSlots(d.bonuses || []);
     const del = $("#del-btn"); del.hidden = !deal; del.textContent = "Delete"; del.classList.remove("confirm-del");
     $("#save-btn").textContent = from ? "Save new deal" : "Save";
     kindChanged();
@@ -1006,12 +1073,13 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     const old = data().find(f => f.id === editing) || {};
     const bonuses = [...document.querySelectorAll("#bonus-rows .bonus-row")].map(r => ({
       id: r.dataset.id,
-      source: r.querySelector(".src").value.trim(),
+      type: r.dataset.type,
+      source: r.dataset.type === "retailer" ? "Retailer bonus" : r.dataset.type === "econnex" ? "Econnex" : ((r.querySelector("input.src") || {}).value || "").trim(),
       amount: Number(r.querySelector(".amt-in").value || 0),
       stayDays: Math.max(0, Number(r.querySelector(".days-in input").value || 0)),
       status: r.querySelector(".st").value,
       paidOn: r.querySelector(".st").value === "paid" ? (r.dataset.paidOn || (r.dataset.wasPaid ? null : toISO(today()))) : null,
-    })).filter(b => b.source || b.amount);
+    })).filter(b => b.amount > 0 || (b.type === "other" && b.source));
     return {
       id: editing || uid(),
       retailer, start,
@@ -1051,7 +1119,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     } catch {} finally { $("#save-btn").disabled = false; }
   });
   $("#cancel-btn").onclick = () => dlg.close();
-  $("#add-bonus").onclick = () => bonusRow();
+  $("#add-bonus").onclick = () => bonusRow({}, "other");
   $("#del-btn").onclick = async () => {
     const b = $("#del-btn");
     if (!delArmed) { delArmed = true; b.textContent = "Tap again to delete"; b.classList.add("confirm-del"); return; }
@@ -1126,7 +1194,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       id: String(f.id || uid()).replace(/[^A-Za-z0-9_\-.~:@+]/g, "").slice(0, 60) || uid(),
       retailer: String(f.retailer), start: String(f.start), end: f.end ? String(f.end) : null,
       fuel: String(f.fuel || "Electricity"), stayMonths: Number(f.stayMonths ?? 3), noReturnMonths: Number(f.noReturnMonths ?? 12),
-      bonuses: Array.isArray(f.bonuses) ? f.bonuses.map(b => ({ id: String(b.id || uid()), source: String(b.source || ""), amount: Number(b.amount || 0), stayDays: Number(b.stayDays || 0), paidOn: b.paidOn ? String(b.paidOn) : null, status: ["pending","tracked","paid"].includes(b.status) ? b.status : "pending" })) : [],
+      bonuses: Array.isArray(f.bonuses) ? f.bonuses.map(b => ({ id: String(b.id || uid()), source: String(b.source || ""), amount: Number(b.amount || 0), stayDays: Number(b.stayDays || 0), paidOn: b.paidOn ? String(b.paidOn) : null, type: bonusType(b), status: ["pending","tracked","paid"].includes(b.status) ? b.status : "pending" })) : [],
       notes: String(f.notes || ""), considering: !!f.considering,
       rates: f.rates && typeof f.rates === "object" ? { supply: f.rates.supply ?? null, peak: f.rates.peak ?? null, off: f.rates.off ?? null, fit: f.rates.fit ?? null } : null,
       createdAt: f.createdAt || new Date().toISOString(),
