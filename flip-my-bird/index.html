@@ -181,6 +181,8 @@ details.more[open] > summary { margin-bottom: 10px; }
 .tbl th { color: var(--muted); font-weight: 600; }
 .deal .summary { font-size: 14px; color: var(--muted); }
 .deal .summary strong { color: var(--ink); font-family: var(--mono); font-weight: 500; }
+.via { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.via input { width: auto; }
 .slot-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
 .slot-head i, .chip i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -450,7 +452,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     const start = parse(f.start);
     const rules = [{ label: `${f.retailer} plan`, detail: `${f.stayMonths} month${f.stayMonths == 1 ? "" : "s"}`, date: addMonths(start, f.stayMonths), source: null }];
     for (const b of (f.bonuses || [])) if (Number(b.stayDays) > 0)
-      rules.push({ label: bonusLabel(b), detail: `${b.stayDays} days`, date: addDays(start, b.stayDays), source: bonusType(b) === "retailer" ? "sign up bonus" : bonusType(b) === "econnex" ? "Econnex" : (b.source || "cashback") });
+      rules.push({ label: bonusLabel(b), detail: `${b.stayDays} days`, date: addDays(start, b.stayDays), source: bonusType(b) === "retailer" ? "sign up bonus" : bonusType(b) === "econnex" ? "Econnex" : bonusLabel(b) });
     return rules.sort((a, b) => a.date - b.date);
   }
   const freeDate = (f) => stayRules(f).reduce((m, r) => r.date > m ? r.date : m, parse(f.start));
@@ -523,8 +525,8 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
   // Every flip can earn up to three kinds of bonus. Older entries are sorted into a kind by name.
   const TYPES = [
     { id: "retailer", name: "Retailer bonus", hint: "Sign-up credit from the energy company" },
-    { id: "econnex", name: "Econnex", hint: "Reward for switching through Econnex" },
-    { id: "cashback", name: "Cashback site", hint: "ShopBack, TopCashback, Cashrewards…" },
+    { id: "econnex", name: "Econnex", hint: "Paid by Econnex itself" },
+    { id: "cashback", name: "Cashback site", hint: "Paid by ShopBack, TopCashback… even if it sends you through Econnex" },
   ];
   function bonusType(b) {
     if (b.type) return b.type;
@@ -538,7 +540,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     const t = bonusType(b);
     if (t === "retailer") return "Retailer bonus";
     if (t === "econnex") return "Econnex";
-    if (t === "cashback") return b.source && !/^cash ?back( site)?$/i.test(b.source) ? b.source : "Cashback site";
+    if (t === "cashback") return (b.source && !/^cash ?back( site)?$/i.test(b.source) ? b.source : "Cashback site") + (b.viaEconnex ? " via Econnex" : "");
     return b.source || "Other bonus";
   }
   function bonusChips(f) {
@@ -547,7 +549,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       const items = bs.filter(b => bonusType(b) === t.id && Number(b.amount) > 0);
       const amt = items.reduce((s, b) => s + Number(b.amount), 0);
       const paid = items.length && items.every(b => b.status === "paid");
-      return amt ? `<span class="chip"><i style="background:var(--t-${t.id})"></i>${esc(t.name)} <span class="num">${money(amt)}</span>${paid ? " ✓" : ""}</span>`
+      return amt ? `<span class="chip"><i style="background:var(--t-${t.id})"></i>${esc(items.length === 1 ? bonusLabel(items[0]) : t.name)} <span class="num">${money(amt)}</span>${paid ? " ✓" : ""}</span>`
         : `<span class="chip none"><i style="background:var(--t-${t.id});opacity:.35"></i>${esc(t.name)}: none</span>`;
     });
     for (const b of bs.filter(b => bonusType(b) === "other" && Number(b.amount) > 0))
@@ -816,7 +818,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     const seg = (x, y0, y1, fill, top, faded) => {
       const h = y0 - y1; if (h <= 0) return "";
       const r = top ? Math.min(4, h, bw / 2) : 0;
-      return `<path fill="${fill}"${faded ? ' fill-opacity="0.4"' : ""} d="M${x},${y0} V${y1 + r} Q${x},${y1} ${x + r},${y1} H${x + bw - r} Q${x + bw},${y1} ${x + bw},${y1 + r} V${y0} Z"/>`;
+      return `<path fill="${fill}"${faded ? ' fill-opacity="0.5"' : ""} d="M${x},${y0} V${y1 + r} Q${x},${y1} ${x + r},${y1} H${x + bw - r} Q${x + bw},${y1} ${x + bw},${y1 + r} V${y0} Z"/>`;
     };
     let bars = "", labels = "";
     ms.forEach((m, i) => {
@@ -960,17 +962,20 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
         <option value="pending">Not tracked yet</option><option value="tracked">Tracked</option><option value="paid">Paid</option>
       </select>
       <label class="days-in">Stay <input type="number" min="0" max="730" step="1" inputmode="numeric" placeholder="–" aria-label="Days you must stay for this bonus" value="${esc(b.stayDays || "")}"> days</label>
+      ${t === "cashback" ? `<label class="via"><input type="checkbox" class="via-in"${b.viaEconnex ? " checked" : ""}> The cashback site sent me through Econnex</label>` : ""}
       ${fixed ? "<span></span>" : '<button type="button" aria-label="Remove bonus">✕</button>'}
       <div class="links"></div>`;
     row.querySelector(".st").value = b.status || "pending";
     const rm = row.querySelector("button"); if (rm) rm.onclick = () => row.remove();
     const links = () => {
       const srcEl = row.querySelector("input.src");
-      const src = t === "retailer" ? "sign up bonus" : t === "econnex" ? "Econnex" : (srcEl && srcEl.value) || (t === "cashback" ? "cashback" : "");
+      const via = row.querySelector(".via-in");
+      const src = t === "retailer" ? "sign up bonus" : t === "econnex" ? "Econnex" : ((srcEl && srcEl.value) || (t === "cashback" ? "cashback" : "")) + (via && via.checked ? " Econnex" : "");
       const html = termsLinks(src, $("#f-retailer").value);
       row.querySelector(".links").innerHTML = html ? `Check the stay rule: ${html}` : "";
     };
     const srcEl = row.querySelector("input.src"); if (srcEl) srcEl.addEventListener("input", links);
+    const viaEl = row.querySelector(".via-in"); if (viaEl) viaEl.addEventListener("change", links);
     row._links = links; links();
     $("#bonus-rows").appendChild(row);
   }
@@ -1074,6 +1079,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     const bonuses = [...document.querySelectorAll("#bonus-rows .bonus-row")].map(r => ({
       id: r.dataset.id,
       type: r.dataset.type,
+      viaEconnex: !!(r.querySelector(".via-in") && r.querySelector(".via-in").checked),
       source: r.dataset.type === "retailer" ? "Retailer bonus" : r.dataset.type === "econnex" ? "Econnex" : ((r.querySelector("input.src") || {}).value || "").trim(),
       amount: Number(r.querySelector(".amt-in").value || 0),
       stayDays: Math.max(0, Number(r.querySelector(".days-in input").value || 0)),
@@ -1194,7 +1200,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       id: String(f.id || uid()).replace(/[^A-Za-z0-9_\-.~:@+]/g, "").slice(0, 60) || uid(),
       retailer: String(f.retailer), start: String(f.start), end: f.end ? String(f.end) : null,
       fuel: String(f.fuel || "Electricity"), stayMonths: Number(f.stayMonths ?? 3), noReturnMonths: Number(f.noReturnMonths ?? 12),
-      bonuses: Array.isArray(f.bonuses) ? f.bonuses.map(b => ({ id: String(b.id || uid()), source: String(b.source || ""), amount: Number(b.amount || 0), stayDays: Number(b.stayDays || 0), paidOn: b.paidOn ? String(b.paidOn) : null, type: bonusType(b), status: ["pending","tracked","paid"].includes(b.status) ? b.status : "pending" })) : [],
+      bonuses: Array.isArray(f.bonuses) ? f.bonuses.map(b => ({ id: String(b.id || uid()), source: String(b.source || ""), amount: Number(b.amount || 0), stayDays: Number(b.stayDays || 0), paidOn: b.paidOn ? String(b.paidOn) : null, type: bonusType(b), viaEconnex: !!b.viaEconnex, status: ["pending","tracked","paid"].includes(b.status) ? b.status : "pending" })) : [],
       notes: String(f.notes || ""), considering: !!f.considering,
       rates: f.rates && typeof f.rates === "object" ? { supply: f.rates.supply ?? null, peak: f.rates.peak ?? null, off: f.rates.off ?? null, fit: f.rates.fit ?? null } : null,
       createdAt: f.createdAt || new Date().toISOString(),
