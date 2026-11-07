@@ -5,8 +5,9 @@ A tiny tracker for Australians who switch energy retailers to collect sign-up bo
 
 It answers three questions:
 
-1. **Who am I with, and when can I flip?** Counts down to the end of the minimum stay
-   (usually 2–3 months) so you don't lose the bonus.
+1. **Who am I with, and when can I flip?** Each deal can have several stay rules: the energy
+   company's (in months) and one per bonus (in days, e.g. Econnex via a cashback site). The countdown
+   waits for whichever ends last. Each bonus links to its cashback site, OzBargain and a terms search.
 2. **Which bonuses are still owed?** Tracks each cashback as *not tracked*, *tracked* or *paid*.
 3. **Who can I go back to?** Shows when each retailer you've left will treat you as a
    new customer again (often 12 months).

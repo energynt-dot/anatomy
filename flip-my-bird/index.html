@@ -112,8 +112,22 @@ form.sheet h3 { margin: 0; font: 800 22px/1.2 var(--display); }
 input, select, textarea { font: 15px var(--body); padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
   background: var(--bg); color: var(--ink); width: 100%; min-width: 0; }
 textarea { min-height: 64px; resize: vertical; }
-.bonus-row { display: grid; grid-template-columns: 1.4fr 0.8fr 1fr auto; gap: 8px; align-items: center; }
-.bonus-row button { padding: 8px 10px; }
+.bonus-row { display: grid; grid-template-columns: 1.3fr 0.7fr 1fr 1.1fr auto; gap: 8px; align-items: center;
+  padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
+.bonus-row > button { padding: 8px 10px; }
+.days-in { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); white-space: nowrap; min-width: 0; }
+.days-in input { width: 4.5em; flex: 1 1 auto; text-align: center; }
+.bonus-row .links { grid-column: 1 / -1; font-size: 12px; color: var(--muted); display: flex; gap: 4px 12px; flex-wrap: wrap; }
+a { color: var(--accent); }
+.links a { font-weight: 600; text-decoration: none; }
+.links a:hover { text-decoration: underline; }
+.reqs { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.req { display: flex; gap: 10px; align-items: baseline; font-size: 14px; flex-wrap: wrap; }
+.req .what { flex: 1; min-width: 0; }
+.req .when { font: 500 13px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.req .tick { color: var(--ok); font-weight: 700; }
+.req.last .when { color: var(--accent); font-weight: 700; }
+.req .links { width: 100%; font-size: 12px; display: flex; gap: 12px; flex-wrap: wrap; }
 .warn { background: var(--wait-soft); color: var(--wait); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
 .warn.stop { background: var(--stop-soft); color: var(--stop); }
 .form-actions { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
@@ -123,8 +137,10 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
 
 @media (max-width: 460px) {
   .grid2 { grid-template-columns: 1fr; }
-  .bonus-row { grid-template-columns: 1fr 1fr; }
+  .bonus-row { grid-template-columns: 1fr 1fr auto; }
   .bonus-row .src { grid-column: 1 / -1; }
+  .bonus-row .amt-in { grid-column: 1; } .bonus-row .st { grid-column: 2 / -1; }
+  .bonus-row .days-in { grid-column: 1 / 3; }
   .deal .who { font-size: 28px; }
   .big-count .n { font-size: 48px; }
 }
@@ -213,9 +229,9 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     </div>
     <div class="grid2">
       <div class="field">
-        <label for="f-stay">Must stay for (months)</label>
+        <label for="f-stay">Energy company: must stay (months)</label>
         <input id="f-stay" type="number" min="0" max="36" step="1" value="3" inputmode="numeric">
-        <span class="hint">To keep the bonus. Usually 2–3.</span>
+        <span class="hint">From their own T&amp;Cs. Usually 2–3.</span>
       </div>
       <div class="field">
         <label for="f-noreturn">Can't come back for (months)</label>
@@ -225,6 +241,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     </div>
     <div class="field">
       <label>Bonuses for this deal</label>
+      <span class="hint">Cashback sites have their own stay rule, often 30–90 days from when you're connected. Put it in "stay days". Your countdown waits for whichever rule ends last.</span>
       <div id="bonus-rows" style="display:grid;gap:8px"></div>
       <div><button type="button" class="small" id="add-bonus">+ Add bonus</button></div>
     </div>
@@ -294,7 +311,34 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
   // ---------- derived ----------
-  const freeDate = (f) => addMonths(parse(f.start), f.stayMonths);
+  const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + Number(n || 0));
+  // Every stay rule on a deal: the energy company's, plus each bonus that has its own.
+  function stayRules(f) {
+    const start = parse(f.start);
+    const rules = [{ label: `${f.retailer} plan`, detail: `${f.stayMonths} month${f.stayMonths == 1 ? "" : "s"}`, date: addMonths(start, f.stayMonths), source: null }];
+    for (const b of (f.bonuses || [])) if (Number(b.stayDays) > 0)
+      rules.push({ label: b.source || "Bonus", detail: `${b.stayDays} days`, date: addDays(start, b.stayDays), source: b.source || "" });
+    return rules.sort((a, b) => a.date - b.date);
+  }
+  const freeDate = (f) => stayRules(f).reduce((m, r) => r.date > m ? r.date : m, parse(f.start));
+  const SITES = {
+    econnex: "https://www.econnex.com.au/",
+    shopback: "https://www.shopback.com.au/",
+    topcashback: "https://www.topcashback.com.au/",
+    cashrewards: "https://www.cashrewards.com.au/",
+  };
+  function termsLinks(source, retailer) {
+    const src = String(source || "").trim(); if (!src) return "";
+    const key = src.toLowerCase().replace(/[^a-z]/g, "");
+    const sites = Object.keys(SITES).filter(k => key.includes(k));
+    const q = (extra) => encodeURIComponent(`${src} ${retailer || ""} ${extra}`.replace(/\s+/g, " ").trim());
+    const out = [];
+    const names = { econnex: "Econnex", shopback: "ShopBack", topcashback: "TopCashback", cashrewards: "Cashrewards" };
+    for (const k of sites) out.push(`<a href="${SITES[k]}" target="_blank" rel="noopener">${names[k]} site</a>`);
+    out.push(`<a href="https://www.ozbargain.com.au/search/node/${q("")}" target="_blank" rel="noopener">OzBargain posts</a>`);
+    out.push(`<a href="https://www.google.com/search?q=${q("cashback terms conditions stay days")}" target="_blank" rel="noopener">Search the terms</a>`);
+    return out.join("");
+  }
   const returnDate = (f) => f.end ? addMonths(parse(f.end), f.noReturnMonths) : null;
   const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+(energy|electric|power)$/, "");
 
@@ -384,7 +428,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       const pill = done ? `<span class="pill ok">Free to flip</span>`
         : left <= 14 ? `<span class="pill wait">Nearly there</span>` : `<span class="pill dim">Staying put</span>`;
       const count = done
-        ? `<div class="big-count"><span class="n">Go</span><span class="u">You've done your ${f.stayMonths} months since ${esc(fmt(free))}. Time to find the next bonus.</span></div>`
+        ? `<div class="big-count"><span class="n">Go</span><span class="u">Every stay rule finished by ${esc(fmt(free))}. Time to find the next bonus.</span></div>`
         : `<div class="big-count"><span class="n num">${left}</span><span class="u">${left === 1 ? "day" : "days"} until you can flip, on <strong>${esc(fmt(free))}</strong></span></div>`;
       const pend = (f.bonuses || []).filter(b => b.status !== "paid").reduce((s, b) => s + Number(b.amount || 0), 0);
       return `<div class="deal">
@@ -397,7 +441,12 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
         </div>
         ${count}
         <div><div class="track ${done ? "done" : ""}"><i style="width:${pct}%"></i></div>
-          <div class="ends"><span>${esc(fmt(start))}</span><span>${f.stayMonths} month stay</span><span>${esc(fmt(free))}</span></div></div>
+          <div class="ends"><span>${esc(fmt(start))}</span><span>${esc(fmt(free))}</span></div></div>
+        <div class="reqs">${stayRules(f).map((r, i, a) => `<div class="req ${i === a.length - 1 && !done ? "last" : ""}">
+            <span class="what">${r.date <= t ? '<span class="tick">✓</span> ' : ""}<strong>${esc(r.label)}</strong> · stay ${esc(r.detail)}</span>
+            <span class="when">${esc(fmt(r.date))}</span>
+            ${r.source !== null ? `<span class="links">${termsLinks(r.source, f.retailer)}</span>` : ""}
+          </div>`).join("")}</div>
         <div class="actions">
           <button class="primary" data-act="flip" data-id="${esc(f.id)}">I've flipped</button>
           <button data-act="edit" data-id="${esc(f.id)}">Edit deal</button>
@@ -419,7 +468,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     $("#pending-list").innerHTML = rows.length ? rows.map(({ f, b }) => `
       <div class="item">
         <div class="main"><div class="t">${esc(b.source || "Bonus")}</div>
-          <div class="s">${esc(f.retailer)} · ${esc(label[b.status] || "Waiting")}</div></div>
+          <div class="s">${esc(f.retailer)} · ${esc(label[b.status] || "Waiting")}${Number(b.stayDays) > 0 ? ` · stay until ${esc(fmt(addDays(parse(f.start), b.stayDays)))}` : ""}</div></div>
         <span class="amt">${money(b.amount)}</span>
         <button class="small" data-act="paid" data-id="${esc(f.id)}" data-b="${esc(b.id)}">Paid</button>
       </div>`).join("")
@@ -475,9 +524,17 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       <select class="st" aria-label="Status">
         <option value="pending">Not tracked yet</option><option value="tracked">Tracked</option><option value="paid">Paid</option>
       </select>
-      <button type="button" aria-label="Remove bonus">✕</button>`;
+      <label class="days-in">Stay <input type="number" min="0" max="730" step="1" inputmode="numeric" placeholder="–" aria-label="Days you must stay for this bonus" value="${esc(b.stayDays || "")}"> days</label>
+      <button type="button" aria-label="Remove bonus">✕</button>
+      <div class="links"></div>`;
     row.querySelector(".st").value = b.status || "pending";
     row.querySelector("button").onclick = () => row.remove();
+    const links = () => {
+      const html = termsLinks(row.querySelector(".src").value, $("#f-retailer").value);
+      row.querySelector(".links").innerHTML = html ? `Check the stay rule: ${html}` : "";
+    };
+    row.querySelector(".src").addEventListener("input", links);
+    row._links = links; links();
     $("#bonus-rows").appendChild(row);
   }
 
@@ -522,6 +579,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     $("#form-warn").innerHTML = msgs.join("");
   }
   ["#f-retailer", "#f-start"].forEach(s => $(s).addEventListener("input", updateWarn));
+  $("#f-retailer").addEventListener("input", () => document.querySelectorAll("#bonus-rows .bonus-row").forEach(r => r._links && r._links()));
 
   function readForm() {
     const retailer = $("#f-retailer").value.trim();
@@ -533,6 +591,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       id: r.dataset.id,
       source: r.querySelector(".src").value.trim(),
       amount: Number(r.querySelector(".amt-in").value || 0),
+      stayDays: Math.max(0, Number(r.querySelector(".days-in input").value || 0)),
       status: r.querySelector(".st").value,
     })).filter(b => b.source || b.amount);
     return {
@@ -627,7 +686,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       id: String(f.id || uid()).replace(/[^A-Za-z0-9_\-.~:@+]/g, "").slice(0, 60) || uid(),
       retailer: String(f.retailer), start: String(f.start), end: f.end ? String(f.end) : null,
       fuel: String(f.fuel || "Electricity"), stayMonths: Number(f.stayMonths ?? 3), noReturnMonths: Number(f.noReturnMonths ?? 12),
-      bonuses: Array.isArray(f.bonuses) ? f.bonuses.map(b => ({ id: String(b.id || uid()), source: String(b.source || ""), amount: Number(b.amount || 0), status: ["pending","tracked","paid"].includes(b.status) ? b.status : "pending" })) : [],
+      bonuses: Array.isArray(f.bonuses) ? f.bonuses.map(b => ({ id: String(b.id || uid()), source: String(b.source || ""), amount: Number(b.amount || 0), stayDays: Number(b.stayDays || 0), status: ["pending","tracked","paid"].includes(b.status) ? b.status : "pending" })) : [],
       notes: String(f.notes || ""), createdAt: f.createdAt || new Date().toISOString(),
     }));
     example = null;
@@ -645,9 +704,9 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       { id: "ex2", retailer: "Origin Energy", fuel: "Electricity", start: iso(e1), end: iso(e2), stayMonths: 3, noReturnMonths: 12,
         bonuses: [{ id: "b2", source: "TopCashback", amount: 150, status: "paid" }, { id: "b3", source: "Retailer sign-up credit", amount: 50, status: "paid" }], notes: "Example", createdAt: "" },
       { id: "ex3", retailer: "EnergyAustralia", fuel: "Electricity", start: iso(s3), end: iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 80)), stayMonths: 2, noReturnMonths: 12,
-        bonuses: [{ id: "b4", source: "Econnex", amount: 100, status: "tracked" }], notes: "Example", createdAt: "" },
+        bonuses: [{ id: "b4", source: "Econnex", amount: 100, status: "tracked", stayDays: 45 }], notes: "Example", createdAt: "" },
       { id: "ex4", retailer: "Red Energy", fuel: "Electricity", start: iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 80)), end: null, stayMonths: 3, noReturnMonths: 12,
-        bonuses: [{ id: "b5", source: "ShopBack", amount: 140, status: "tracked" }], notes: "Example", createdAt: "" },
+        bonuses: [{ id: "b5", source: "Econnex via ShopBack", amount: 140, status: "tracked", stayDays: 90 }], notes: "Example", createdAt: "" },
     ];
   }
 
