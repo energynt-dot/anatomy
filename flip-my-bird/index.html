@@ -865,13 +865,25 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       tip.style.top = Math.max(0, y(m.cum) * sx - tip.offsetHeight - 12) + "px";
       hl.setAttribute("x1", cx(i)); hl.setAttribute("x2", cx(i)); hl.setAttribute("opacity", "0.5");
     };
-    const hide = () => { tip.hidden = true; hl.setAttribute("opacity", "0"); };
+    // Mouse: follows the pointer. Touch: a tap keeps the box up for 10 seconds;
+    // tapping the same month again, or anywhere else, closes it.
+    let pinned = -1;
+    const hide = () => { clearTimeout(tipTimer); pinned = -1; tip.hidden = true; hl.setAttribute("opacity", "0"); };
     el.querySelectorAll("rect[data-i]").forEach(r => {
-      r.addEventListener("pointerenter", () => show(+r.dataset.i));
-      r.addEventListener("pointerdown", () => show(+r.dataset.i));
+      r.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") show(+r.dataset.i); });
+      r.addEventListener("pointerdown", (e) => {
+        if (e.pointerType === "mouse") return;
+        const i = +r.dataset.i;
+        if (pinned === i) { hide(); return; }
+        show(i); pinned = i;
+        clearTimeout(tipTimer); tipTimer = setTimeout(hide, 10000);
+      });
     });
-    el.querySelector("svg").addEventListener("pointerleave", hide);
+    el.querySelector("svg").addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") hide(); });
+    tipHide = hide;
   }
+  let tipTimer = 0, tipHide = () => {};
+  document.addEventListener("pointerdown", (e) => { if (e.pointerType !== "mouse" && !e.target.closest("#chart")) tipHide(); });
   let rsz; window.addEventListener("resize", () => { clearTimeout(rsz); rsz = setTimeout(drawChart, 150); });
 
   // ---------- views ----------
