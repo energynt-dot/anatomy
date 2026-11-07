@@ -19,6 +19,10 @@ still in its no-return window.
 4. **What will this deal really cost?** Put in a deal's rates (supply, peak, off-peak, feed-in) and
    your average daily grid use. Each deal shows its cost per day, over the stay, and after bonuses.
 
+5. **Is this new deal worth it?** Add a deal you're considering. It shows its cost after bonuses
+   next to staying where you are. Tap "I've switched to this" when you do, and your old deal ends.
+   You can only be with one company per fuel; the app ends the old one or flags a clash.
+
 ## Running it
 
 It's one file with no build step. Open `index.html` in a browser.

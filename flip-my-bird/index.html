@@ -33,6 +33,7 @@
   color-scheme: dark; }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); margin: 0; }
 .wrap { max-width: 640px; margin: 0 auto; padding-block: 20px 64px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -132,6 +133,14 @@ a { color: var(--accent); }
 .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .estimate { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
 .estimate strong { font-family: var(--mono); }
+.idea { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 10px; }
+.idea .row1 { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.idea .name { font: 700 20px/1.15 var(--display); overflow-wrap: anywhere; }
+.verdict { font-size: 14px; }
+.verdict strong { font-family: var(--mono); }
+.conflict { background: var(--stop-soft); color: var(--stop); border-radius: 14px; padding: 14px 16px; display: grid; gap: 10px; font-size: 14px; }
+.conflict .actions button { border-color: var(--stop); color: var(--stop); background: transparent; }
+.ideas { display: grid; gap: 10px; }
 .reqs { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
 .req { display: flex; gap: 10px; align-items: baseline; font-size: 14px; flex-wrap: wrap; }
 .req .what { flex: 1; min-width: 0; }
@@ -182,6 +191,11 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
   <section class="sec" id="now-sec">
     <h2>Right now</h2>
     <div id="now"></div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-head"><h2>Deals I'm considering</h2><button class="ghost small" data-act="consider">+ Add a deal to compare</button></div>
+    <div class="ideas" id="ideas"></div>
   </section>
 
   <section class="sec">
@@ -240,15 +254,23 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
         <select id="f-fuel"><option>Electricity</option><option>Gas</option><option>Electricity + Gas</option></select>
       </div>
     </div>
+    <div class="field">
+      <label for="f-kind">This deal is</label>
+      <select id="f-kind">
+        <option value="current">Who I'm with now</option>
+        <option value="considering">One I'm thinking about</option>
+        <option value="past">One I've already left</option>
+      </select>
+    </div>
     <div class="grid2">
       <div class="field">
-        <label for="f-start">Started on</label>
+        <label for="f-start" id="f-start-label">Started on</label>
         <input id="f-start" type="date" required>
+        <span class="hint" id="f-start-hint">The day you were connected.</span>
       </div>
-      <div class="field">
+      <div class="field" id="f-end-field">
         <label for="f-end">Left on</label>
         <input id="f-end" type="date">
-        <span class="hint">Leave blank if you're still with them.</span>
       </div>
     </div>
     <div class="grid2">
@@ -397,6 +419,13 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       <div class="line total"><span>What this deal really costs you</span><span>${stay - bonus < 0 ? "−" : ""}${money(Math.abs(stay - bonus))}</span></div>` : ""}
     </div>`;
   }
+  const hasElec = (fuel) => String(fuel || "").includes("Electricity");
+  const hasGas = (fuel) => String(fuel || "").includes("Gas");
+  const fuelsOverlap = (a, b) => (hasElec(a) && hasElec(b)) || (hasGas(a) && hasGas(b));
+  const isLive = (f) => !f.considering;
+  const isCurrent = (f) => isLive(f) && !f.end;
+  // Current deals that clash with f (same fuel). You can only be with one company per fuel.
+  const clashes = (f, list = data()) => list.filter(x => x.id !== f.id && isCurrent(x) && fuelsOverlap(x.fuel, f.fuel));
   const returnDate = (f) => f.end ? addMonths(parse(f.end), f.noReturnMonths) : null;
   const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+(energy|electric|power)$/, "");
 
@@ -460,10 +489,12 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     const all = sortFlips(data());
     $("#example-banner").hidden = !example;
     fillUsage();
-    renderNow(all);
-    renderMoney(all);
-    renderCooldowns(all);
-    renderHistory(all);
+    const live = all.filter(isLive), ideas = all.filter(f => f.considering);
+    renderNow(live);
+    renderIdeas(ideas, live);
+    renderMoney(live);
+    renderCooldowns(live);
+    renderHistory(live);
   }
 
   function renderNow(all) {
@@ -486,7 +517,16 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       return;
     }
     const t = today();
-    el.innerHTML = active.map(f => {
+    let warn = "";
+    const seen = new Set();
+    for (const f of active) {
+      const c = clashes(f, active);
+      if (!c.length || seen.has(f.id)) continue;
+      const group = [f, ...c]; group.forEach(g => seen.add(g.id));
+      warn += `<div class="conflict"><div><strong>You can only be with one company for ${esc(hasElec(f.fuel) ? "electricity" : "gas")}.</strong> These are all marked as current: ${group.map(g => esc(g.retailer)).join(" and ")}. Move the ones you haven't switched to into "considering".</div>
+        <div class="actions">${group.map(g => `<button class="small" data-act="to-consider" data-id="${esc(g.id)}">${esc(g.retailer)} is just an idea</button>`).join("")}</div></div>`;
+    }
+    el.innerHTML = warn + active.map(f => {
       const start = parse(f.start), free = freeDate(f);
       const total = Math.max(1, daysBetween(start, free));
       const gone = Math.min(total, Math.max(0, daysBetween(start, t)));
@@ -510,7 +550,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
         ${count}
         <div><div class="track ${done ? "done" : ""}"><i style="width:${pct}%"></i></div>
           <div class="ends"><span>${esc(fmt(start))}</span><span>${esc(fmt(free))}</span></div></div>
-        ${costBlock(f)}
+        ${costBlock(f) || `<div class="cost"><div class="sub">Add ${esc(f.retailer)}'s rates (Edit deal) to compare it with the deals you're considering.</div></div>`}
         <div class="reqs">${stayRules(f).map((r, i, a) => `<div class="req ${i === a.length - 1 && !done ? "last" : ""}">
             <span class="what">${r.date <= t ? '<span class="tick">✓</span> ' : ""}<strong>${esc(r.label)}</strong> · stay ${esc(r.detail)}</span>
             <span class="when">${esc(fmt(r.date))}</span>
@@ -519,6 +559,50 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
         <div class="actions">
           <button class="primary" data-act="flip" data-id="${esc(f.id)}">I've flipped</button>
           <button data-act="edit" data-id="${esc(f.id)}">Edit deal</button>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderIdeas(ideas, live) {
+    const el = $("#ideas");
+    const t = today();
+    const current = live.filter(isCurrent);
+    if (!ideas.length) {
+      el.innerHTML = `<div class="list"><div class="empty-line">Found a deal? Add it here to see what it would really cost${current.length ? ` next to ${esc(current[0].retailer)}` : ""}, before you switch.</div></div>`;
+      return;
+    }
+    el.innerHTML = ideas.map(f => {
+      const cur = current.find(c => fuelsOverlap(c.fuel, f.fuel));
+      const startD = parse(f.start) < t ? t : parse(f.start);
+      const draft = { ...f, start: toISO(startD) };
+      const days = Math.max(1, daysBetween(startD, freeDate(draft)));
+      const bonus = (f.bonuses || []).reduce((s, b) => s + Number(b.amount || 0), 0);
+      const u = use();
+      let verdict = "";
+      if (hasRates(f.rates)) {
+        const mine = dailyCost(f.rates, u).total * days - bonus;
+        verdict = `<div class="verdict">Over its ${days}-day stay: <strong>${money(dailyCost(f.rates, u).total * days)}</strong>${bonus ? `, or <strong>${mine < 0 ? "−" : ""}${money(Math.abs(mine))}</strong> after ${money(bonus)} in bonuses` : ""}.</div>`;
+        if (cur && hasRates(cur.rates)) {
+          const stay = dailyCost(cur.rates, u).total * days;
+          const diff = stay - mine;
+          verdict += `<div class="verdict">Staying with ${esc(cur.retailer)} for those ${days} days: <strong>${money(stay)}</strong>. ${diff >= 0 ? `Switching saves you about <strong>${money(diff)}</strong>.` : `Switching costs you about <strong>${money(-diff)}</strong> more.`}</div>`;
+        } else if (cur) verdict += `<div class="sub note">Add ${esc(cur.retailer)}'s rates to see if switching saves you money.</div>`;
+      } else verdict = `<div class="note">Add this deal's rates to see what it would cost.</div>`;
+      let pill = `<span class="pill dim">Idea</span>`;
+      if (cur) {
+        const free = freeDate(cur);
+        pill = free <= t ? `<span class="pill ok">You can switch now</span>` : `<span class="pill wait">Switch from ${esc(fmt(free))}</span>`;
+      }
+      const back = live.filter(x => x.end && norm(x.retailer) === norm(f.retailer)).map(returnDate).sort((a, b) => b - a)[0];
+      const block = back && back > startD ? `<div class="warn stop">You were with ${esc(f.retailer)} recently. They may not give you a new-customer bonus until ${esc(fmt(back))}.</div>` : "";
+      return `<div class="idea">
+        <div class="row1"><div style="min-width:0"><div class="name">${esc(f.retailer)}</div>
+          <div class="meta note">${esc(f.fuel)}${bonus ? ` · ${money(bonus)} in bonuses` : ""}${f.rates && f.rates.supply != null ? ` · supply ${m2(Number(f.rates.supply))}/day` : ""}</div></div>${pill}</div>
+        ${block}${verdict}
+        <div class="actions">
+          <button class="primary small" data-act="switch" data-id="${esc(f.id)}">I've switched to this</button>
+          <button class="small" data-act="edit" data-id="${esc(f.id)}">Edit</button>
         </div>
       </div>`;
     }).join("");
@@ -607,12 +691,15 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     $("#bonus-rows").appendChild(row);
   }
 
-  function openForm({ deal = null, from = null, past = false } = {}) {
+  function openForm({ deal = null, from = null, past = false, kind = null, switching = false } = {}) {
     editing = deal ? deal.id : null;
+    const d = deal ? { ...deal } : {};
+    if (switching) { d.start = toISO(today()); from = clashes({ ...d, considering: false })[0] || null; }
     flipFrom = from ? from.id : null;
     delArmed = false;
-    const d = deal || {};
-    $("#form-title").textContent = deal ? "Edit deal" : from ? `Flipping from ${from.retailer}` : past ? "Add a past deal" : "Add a deal";
+    const k = switching ? "current" : kind || (deal ? (deal.considering ? "considering" : deal.end ? "past" : "current") : past ? "past" : "current");
+    $("#f-kind").value = k;
+    $("#form-title").textContent = switching ? `Switching to ${deal.retailer}` : deal ? "Edit deal" : from ? `Flipping from ${from.retailer}` : k === "considering" ? "Add a deal to compare" : past ? "Add a past deal" : "Add a deal";
     $("#f-retailer").value = d.retailer || "";
     $("#f-fuel").value = d.fuel || (from && from.fuel) || "Electricity";
     $("#f-start").value = d.start || toISO(today());
@@ -626,14 +713,32 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     (d.bonuses && d.bonuses.length ? d.bonuses : [{}]).forEach(bonusRow);
     const del = $("#del-btn"); del.hidden = !deal; del.textContent = "Delete"; del.classList.remove("confirm-del");
     $("#save-btn").textContent = from ? "Save new deal" : "Save";
+    kindChanged();
     updateWarn();
     updateEstimate();
     dlg.showModal();
     if (!deal) $("#f-retailer").focus();
   }
 
+  function kindChanged() {
+    const k = $("#f-kind").value;
+    $("#f-end-field").hidden = k !== "past";
+    $("#f-start-label").textContent = k === "considering" ? "Would start on" : "Started on";
+    $("#f-start-hint").textContent = k === "considering" ? "Your best guess. Used to work out the stay dates." : "The day you were connected.";
+    updateWarn();
+  }
+  $("#f-kind").addEventListener("change", kindChanged);
+  $("#f-fuel").addEventListener("change", updateWarn);
+
   function updateWarn() {
     const msgs = [];
+    if ($("#f-kind").value === "current") {
+      const draft = { id: editing, fuel: $("#f-fuel").value };
+      for (const c of clashes(draft)) {
+        const startV = $("#f-start").value;
+        msgs.push(`<div class="warn">You're marked as with ${esc(c.retailer)} now. Saving will end that deal on ${esc(fmt(parse(startV)) || "the start date")}. If you haven't switched yet, choose "One I'm thinking about" above.</div>`);
+      }
+    }
     const name = norm($("#f-retailer").value);
     const start = parse($("#f-start").value);
     if (name && start) {
@@ -643,7 +748,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
         if (back > start) msgs.push(`<div class="warn stop">You left ${esc(f.retailer)} on ${esc(fmt(parse(f.end)))}. They may not give you a new-customer bonus until ${esc(fmt(back))}.</div>`);
       }
     }
-    if (flipFrom && start) {
+    if (flipFrom && start && $("#f-kind").value === "current") {
       const from = data().find(f => f.id === flipFrom);
       if (from && freeDate(from) > start)
         msgs.push(`<div class="warn">Heads up: your ${esc(from.retailer)} stay isn't done until ${esc(fmt(freeDate(from)))}. Leaving earlier could lose that bonus.</div>`);
@@ -671,6 +776,8 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     const start = $("#f-start").value;
     if (!retailer) { $("#f-retailer").focus(); return null; }
     if (!start) { $("#f-start").focus(); return null; }
+    const kind = $("#f-kind").value;
+    if (kind === "past" && !$("#f-end").value) { $("#f-end").focus(); return null; }
     const old = data().find(f => f.id === editing) || {};
     const bonuses = [...document.querySelectorAll("#bonus-rows .bonus-row")].map(r => ({
       id: r.dataset.id,
@@ -683,7 +790,8 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       id: editing || uid(),
       retailer, start,
       fuel: $("#f-fuel").value,
-      end: $("#f-end").value || null,
+      end: kind === "past" ? $("#f-end").value : null,
+      considering: kind === "considering",
       stayMonths: Math.max(0, Number($("#f-stay").value || 0)),
       noReturnMonths: Math.max(0, Number($("#f-noreturn").value || 0)),
       bonuses,
@@ -704,9 +812,8 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     const f = readForm(); if (!f) return;
     $("#save-btn").disabled = true;
     try {
-      if (flipFrom) {
-        const from = data().find(x => x.id === flipFrom);
-        if (from && !from.end) await persist({ ...from, end: f.start });
+      if (isCurrent(f)) {
+        for (const c of clashes(f)) await persist({ ...c, end: c.start > f.start ? c.start : f.start });
       }
       await persist(f);
       dlg.close();
@@ -728,6 +835,9 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     const act = t.dataset.act, id = t.dataset.id;
     const deal = id && data().find(f => f.id === id);
     if (act === "add") openForm();
+    else if (act === "consider") openForm({ kind: "considering" });
+    else if (act === "switch" && deal) openForm({ deal, switching: true });
+    else if (act === "to-consider" && deal) { t.disabled = true; try { await persist({ ...deal, considering: true, end: null }); } catch { t.disabled = false; } }
     else if (act === "example") { example = sampleData(); render(); window.scrollTo({ top: 0 }); }
     else if (act === "edit" && deal) openForm({ deal });
     else if (act === "flip" && deal) openForm({ from: deal });
@@ -786,7 +896,7 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
       retailer: String(f.retailer), start: String(f.start), end: f.end ? String(f.end) : null,
       fuel: String(f.fuel || "Electricity"), stayMonths: Number(f.stayMonths ?? 3), noReturnMonths: Number(f.noReturnMonths ?? 12),
       bonuses: Array.isArray(f.bonuses) ? f.bonuses.map(b => ({ id: String(b.id || uid()), source: String(b.source || ""), amount: Number(b.amount || 0), stayDays: Number(b.stayDays || 0), status: ["pending","tracked","paid"].includes(b.status) ? b.status : "pending" })) : [],
-      notes: String(f.notes || ""),
+      notes: String(f.notes || ""), considering: !!f.considering,
       rates: f.rates && typeof f.rates === "object" ? { supply: f.rates.supply ?? null, peak: f.rates.peak ?? null, off: f.rates.off ?? null, fit: f.rates.fit ?? null } : null,
       createdAt: f.createdAt || new Date().toISOString(),
     }));
@@ -809,6 +919,8 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
         bonuses: [{ id: "b4", source: "Econnex", amount: 100, status: "tracked", stayDays: 45 }], notes: "Example", createdAt: "" },
       { id: "ex4", retailer: "Red Energy", fuel: "Electricity", start: iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 80)), end: null, stayMonths: 3, noReturnMonths: 12,
         bonuses: [{ id: "b5", source: "Econnex via ShopBack", amount: 140, status: "tracked", stayDays: 90 }], notes: "Example", rates: { supply: 1.35, peak: 38, off: 26, fit: 4 }, createdAt: "" },
+      { id: "ex5", retailer: "GloBird Energy", fuel: "Electricity", start: iso(addMonths(t, 0)), end: null, considering: true, stayMonths: 3, noReturnMonths: 12,
+        bonuses: [{ id: "b6", source: "Econnex", amount: 180, status: "pending", stayDays: 60 }], notes: "Example", rates: { supply: 1.10, peak: 40, off: 28, fit: 5 }, createdAt: "" },
     ];
   }
 
