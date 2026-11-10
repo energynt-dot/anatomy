@@ -30,3 +30,12 @@ It's one file with no build step. Open `index.html` in a browser.
 - Opened as a file or from any web host, data is kept in that browser's `localStorage`.
   Use **Download backup** / **Copy backup** and **Restore** to move it between devices.
 - Published as a claude.ai Artifact, data saves to the owner's account and syncs across devices.
+
+## Example data
+
+`example-data.json` is a made-up backup with five deals: four past and current flips covering
+retailer, Econnex and cashback-site bonuses (one through Econnex), plus a deal being considered.
+To try it, open **Details → Backup → Restore**, then **Load the example file** (or choose the file),
+and press **Restore**. The example deals all have ids starting `example-`, so they're easy to spot
+and delete from **Every flip**. For a look without saving anything, use **Show me an example** on
+an empty app.

@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Flip My Bird</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -400,6 +401,8 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     <p class="note" style="margin:0">Paste a backup, or choose the file you downloaded. Deals with the same id are replaced; others are added.</p>
     <textarea class="backup" id="restore-text" placeholder='{"app":"flip-my-bird", ...}'></textarea>
     <input type="file" id="restore-file" accept=".json,application/json">
+    <div><button type="button" class="small" id="restore-example">Load the example file</button>
+      <span class="note">Made-up deals to try the app. Delete them later from Every flip.</span></div>
     <div id="restore-msg" class="note"></div>
     <div class="form-actions"><div class="r">
       <button type="button" id="restore-cancel">Cancel</button>
@@ -1237,6 +1240,14 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
   };
   $("#restore-open").onclick = () => { $("#restore-text").value = ""; $("#restore-msg").textContent = ""; $("#restore-dlg").showModal(); };
   $("#restore-cancel").onclick = () => $("#restore-dlg").close();
+  $("#restore-example").onclick = async () => {
+    try {
+      const r = await fetch("example-data.json");
+      if (!r.ok) throw 0;
+      $("#restore-text").value = await r.text();
+      $("#restore-msg").textContent = "Example loaded. Press Restore to add these made-up deals.";
+    } catch { $("#restore-msg").textContent = "Couldn't load the example file here. Open example-data.json and paste its text above."; }
+  };
   $("#restore-file").onchange = (e) => {
     const file = e.target.files[0]; if (!file) return;
     const r = new FileReader(); r.onload = () => { $("#restore-text").value = r.result; }; r.readAsText(file);
