@@ -583,34 +583,72 @@ textarea.backup { font: 12px var(--mono); min-height: 120px; }
     };
   }
 
+  // Where deals are kept:
+  //  - the owner: their account (flips/, profile/)
+  //  - anyone else signed in who can save: their own private space (data/users/<id>/)
+  //  - everyone else (outside visitors, or saving refused): this browser
+  const LOCAL_ONLY = LS_KEY + ".local";
+  function useLocal(reason) {
+    store = localStore();
+    setSync("Saved on this device only");
+    $("#backup-note").textContent = reason || "Your deals are saved in this browser only. Download a backup now and then so you don't lose them.";
+    fillUsage();
+    render();
+  }
+  function goLocalAfterRefusal() {
+    unsubs.forEach(u => { try { u(); } catch {} });
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(flips));
+      localStorage.setItem(LS_KEY + ".usage", JSON.stringify(usage));
+      localStorage.setItem(LOCAL_ONLY, "1");
+    } catch {}
+    useLocal("This copy of Flip My Bird can't save to your account, so your deals are saved in this browser. Download a backup now and then so you don't lose them.");
+  }
+  let unsubs = [];
+
   async function boot() {
     route();
     render();
     const c = window.claude;
     const db = c && c.use ? await c.use("db").catch(() => null) : null;
     if (c && c.use) dl = await c.use("downloads").catch(() => null);
-    if (!db) {
-      store = localStore();
-      setSync("Saved on this device only");
-      $("#backup-note").textContent = "Your deals are saved in this browser only. Download a backup now and then so you don't lose them.";
-      fillUsage();
-      render();
-      return;
+    if (!db) { useLocal(); return; }
+    const user = await c.use("user").catch(() => null);
+    const owner = user ? await user.isOwner() : false;
+    let col, usageDoc;
+    if (owner) {
+      col = db.collection("flips");
+      usageDoc = db.doc("profile/usage");
+    } else {
+      let localOnly = false; try { localOnly = localStorage.getItem(LOCAL_ONLY) === "1"; } catch {}
+      const id = user ? await user.id() : null;
+      if (!id || localOnly) { useLocal(); return; }
+      const mine = db.doc("data/users/" + id + "/app");
+      col = mine.collection("flips");
+      usageDoc = db.doc("data/users/" + id + "/usage");
     }
-    const col = db.collection("flips");
-    const usageDoc = db.doc("profile/usage");
-    usageDoc.onSnapshot((snap) => { usage = snap.exists ? { ...snap.data() } : {}; fillUsage(); render(); }, () => {});
+    unsubs.push(usageDoc.onSnapshot((snap) => { usage = snap.exists ? { ...snap.data() } : {}; fillUsage(); render(); }, () => {}));
     let timer = setTimeout(() => setSync("Can't reach your saved deals yet…"), 10000);
-    col.onSnapshot((snap) => {
+    unsubs.push(col.onSnapshot((snap) => {
       flips = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-      if (!snap.metadata.fromCache) { clearTimeout(timer); setSync("Saved to your account"); $("#backup-note").textContent = "Your deals save to your account automatically. You can also keep a copy."; }
+      if (!snap.metadata.fromCache) { clearTimeout(timer); setSync(owner ? "Saved to your account" : "Saved to your account, private to you"); $("#backup-note").textContent = "Your deals save to your account automatically. Nobody else can see them. You can also keep a copy."; }
       render();
-    }, (e) => { clearTimeout(timer); setSync(e.code === "revoked" ? "Saving is off for this view" : "Couldn't load saved deals"); });
+    }, (e) => { clearTimeout(timer); setSync(e.code === "revoked" ? "Saving is off for this view" : "Couldn't load saved deals"); }));
+    // A refused write means this viewer can't save here: move to browser storage and keep going.
+    const guard = (fn) => async (...a) => {
+      try { return await fn(...a); }
+      catch (e) {
+        if (!owner && e && ["invalid_argument", "not_granted", "capability_disabled", "revoked"].includes(e.code)) {
+          goLocalAfterRefusal(); return store[fn.name] ? store[fn.name](...a) : undefined;
+        }
+        throw e;
+      }
+    };
     store = {
       mode: "db",
-      async save(f) { await col.doc(f.id).set(f); },
-      async remove(id) { await col.doc(id).delete(); },
-      async saveUsage(u) { usage = u; render(); await usageDoc.set(u); },
+      save: guard(async function save(f) { await col.doc(f.id).set(f); }),
+      remove: guard(async function remove(id) { await col.doc(id).delete(); }),
+      saveUsage: guard(async function saveUsage(u) { usage = u; render(); await usageDoc.set(u); }),
     };
   }
   function setSync(t) { $("#sync").textContent = t; }
